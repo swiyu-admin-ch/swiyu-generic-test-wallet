@@ -58,8 +58,6 @@ export class CredentialIssuanceV1 implements OnInit {
     }
 
     onResolve(deeplink: string): void {
-
-        console.log("New depplink", deeplink);
         this.reset();
 
         const decodedDeeplink: any = this.credentialService.decodeDeeplink(deeplink);
