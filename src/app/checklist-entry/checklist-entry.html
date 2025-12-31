@@ -1,0 +1,16 @@
+<mat-list-item>
+    @if (data() == undefined) {
+        <mat-icon
+                [fontIcon]="'circle'"
+                [ngStyle]="{ 'color': 'gray' }"
+                aria-hidden="false">
+        </mat-icon>
+    } @else {
+        <mat-icon
+                [fontIcon]="validData() ? 'check_circle' : 'cancel'"
+                [ngStyle]="{'color': validData() ? 'green' : 'red' }"
+                aria-hidden="false">
+        </mat-icon>
+    }
+    {{ text() }}
+</mat-list-item>

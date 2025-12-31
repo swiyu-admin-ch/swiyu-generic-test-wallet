@@ -1,0 +1,11 @@
+<form #f="ngForm" (ngSubmit)="onSubmit(f)" class="input-form" novalidate>
+    <div class="resolver">
+        <mat-form-field appearance="fill" class="example-full-width">
+            <textarea [(ngModel)]="input" matInput name="input" placeholder="Enter deeplink here" rows="6"></textarea>
+        </mat-form-field>
+        <div class="actions">
+            <button color="primary" mat-raised-button type="submit">Resolve</button>
+            <button (click)="reset()" mat-stroked-button type="button">Clear</button>
+        </div>
+    </div>
+</form>

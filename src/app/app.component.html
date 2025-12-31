@@ -1,0 +1,8 @@
+<nav [tabPanel]="tabPanel" mat-tab-nav-bar>
+    @for (link of routes; track link) {
+        <a mat-tab-link [routerLink]="link.path"> {{ link.title }} </a>
+    }
+</nav>
+<mat-tab-nav-panel #tabPanel></mat-tab-nav-panel>
+
+<router-outlet/>

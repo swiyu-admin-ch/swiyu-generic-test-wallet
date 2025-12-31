@@ -1,0 +1,13 @@
+<mat-expansion-panel (closed)="panelOpenState.set(false)" (opened)="panelOpenState.set(true)">
+    <mat-expansion-panel-header>
+        <mat-panel-title>
+            <mat-icon
+                    [fontIcon]="data  == undefined ? 'circle' : 'check_circle'"
+                    [ngStyle]="{ 'color': data == undefined ? 'gray' : 'green' }"
+                    aria-hidden="false">
+            </mat-icon>
+            {{ panelTitle }}
+        </mat-panel-title>
+    </mat-expansion-panel-header>
+    <ng-content></ng-content>
+</mat-expansion-panel>

@@ -1,0 +1,8 @@
+{
+  "/oid4vci": {
+    "target": "https://swiyu-demo-issuer-service-d.apps.p-szb-ros-shrd-npr-01.cloud.admin.ch",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  }
+}
