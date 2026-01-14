@@ -16,6 +16,7 @@ import { CredentialService } from "../creddential.service";
 import { MatButton } from "@angular/material/button";
 import { DeeplinkInput } from "../deeplink-input/deeplink-input";
 import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
+import { WalletService } from "../services/wallet.service";
 
 @Component({
   selector: "app-credential-issuance-v1",
@@ -59,7 +60,8 @@ export class CredentialIssuanceV1 implements OnInit {
 
   constructor(
     private apiService: ApiService,
-    private credentialService: CredentialService
+    private credentialService: CredentialService,
+    private walletService: WalletService
   ) {}
 
   public onResolve(deeplink: string): void {
@@ -85,7 +87,6 @@ export class CredentialIssuanceV1 implements OnInit {
               decodedDeeplink?.credential_issuer
             );
           } else {
-            // Condition not met, return an empty observable
             return of(null);
           }
         }),
@@ -138,6 +139,16 @@ export class CredentialIssuanceV1 implements OnInit {
           payload.then((payload) => {
             this.decodedHeader.set(payload.protectedHeader);
             this.decodedPayload.set(payload.payload);
+
+            this.walletService.storeCredential(
+              this.encodedCredential().credential,
+              this.encodedCredential().format,
+              this.decodedPayload(),
+              this.decodedHeader(),
+              this.registryEntry(),
+              this.privateKey,
+              this.jwk
+            );
           });
           return of(payload);
         })
@@ -207,6 +218,7 @@ export class CredentialIssuanceV1 implements OnInit {
       this.privateKey,
       this.jwk
     );
+    const holderPublicKey = await this.extractPublicKeyFromJwk(this.jwk);
 
     const payload = {
       format: "vc+sd-jwt",
@@ -214,8 +226,19 @@ export class CredentialIssuanceV1 implements OnInit {
         proof_type: "jwt",
         jwt: jwt,
       },
+      holder_public_key: holderPublicKey, 
     };
-    console.log("payload", payload);
+    console.log("payload with holder public key", payload);
     return payload;
+  }
+
+  private async extractPublicKeyFromJwk(jwk: JWK): Promise<any> {
+    return {
+      kty: jwk.kty,
+      crv: jwk.crv,
+      x: jwk.x,
+      y: jwk.y,
+      kid: "holder-key-1",
+    };
   }
 }

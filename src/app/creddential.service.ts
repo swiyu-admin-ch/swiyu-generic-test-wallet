@@ -71,6 +71,8 @@ export class CredentialService {
 
         const jwk = await jose.exportJWK(publicKey);
 
+        console.log("NEW KEY SET GENERATED");
+
         return {publicKey: publicKey, privateKey: privateKey, jwk: jwk}
     }
 

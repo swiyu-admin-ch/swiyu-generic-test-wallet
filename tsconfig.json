@@ -15,6 +15,11 @@
     "lib": [
       "es2020",
       "dom"
-    ]
+    ],
+    "baseUrl": "./",
+    "paths": {
+      "@app/*": ["src/app/*"],
+      "@services/*": ["src/app/services/*"]
+    }
   }
 }

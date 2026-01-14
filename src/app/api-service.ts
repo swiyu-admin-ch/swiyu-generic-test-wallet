@@ -5,7 +5,7 @@ import {
   HttpHeaders,
   HttpParams,
 } from "@angular/common/http";
-import { catchError, Observable, throwError } from "rxjs";
+import { catchError, Observable, throwError, map } from "rxjs";
 
 @Injectable({
   providedIn: "root",
@@ -37,6 +37,46 @@ export class ApiService {
         responseType: "json",
       })
       .pipe(catchError(this.handleError));
+  }
+
+  public resolveRequestObjectFromDeeplink(
+    verifierRequestObjectUrl: string
+  ) : any {
+    if (!verifierRequestObjectUrl) {
+      return throwError(() => new Error("No verifier request object URL provided"));
+    }
+
+    console.log("Resolving", verifierRequestObjectUrl)
+
+    return this.http
+      .get<any>(`${verifierRequestObjectUrl}`, {
+        responseType: "text" as any,
+      })
+      .pipe(
+        map((response: string) => {
+          try {
+            return JSON.parse(response);
+          } catch (e) {
+            return this.decodeJwtPayload(response);
+          }
+        }),
+        catchError(this.handleError)
+      );
+  }
+
+  private decodeJwtPayload(token: string): any {
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        throw new Error("Invalid JWT format");
+      }
+
+      const payload = parts[1];
+      const decoded = atob(payload);
+      return JSON.parse(decoded);
+    } catch (error) {
+      throw new Error(`Failed to decode JWT payload: ${error}`);
+    }
   }
 
   public getAccessToken(preAuthCode: string, tokenEndpointUrl: string): any {
@@ -131,5 +171,38 @@ export class ApiService {
     return `https://${decodeURIComponent(
       iss.substring(iss.indexOf(parts[3]), iss.length).replace(/:/g, "/")
     )}/did.jsonl`;
+  }
+
+  public submitVerificationResponse(
+    responseUri: string,
+    vpToken: string,
+    presentationSubmission: any
+  ): Observable<any> {
+    if (!responseUri) {
+      return throwError(() => new Error("No response_uri provided"));
+    }
+
+    const responseDataUri = `${responseUri}/response-data`;
+
+    const body = new HttpParams()
+      .set("presentation_submission", JSON.stringify(presentationSubmission))
+      .set("vp_token", vpToken);
+
+    const headers = new HttpHeaders({
+      "Content-Type": "application/x-www-form-urlencoded",
+      "SWIYU-API-Version": "1"
+    });
+
+    return this.http
+      .post(responseDataUri, body.toString(), {
+        headers: headers,
+        responseType: "text" as any
+      })
+      .pipe(
+        catchError((error) => {
+          console.error("Error submitting verification response:", error);
+          return throwError(() => new Error("Failed to submit verification response"));
+        })
+      );
   }
 }
