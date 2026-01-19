@@ -8,7 +8,7 @@ import { ChecklistEntry } from "../checklist-entry/checklist-entry";
 import { MatList } from "@angular/material/list";
 import { MatAccordion } from "@angular/material/expansion";
 import { JsonPipe, SlicePipe, CommonModule } from "@angular/common";
-import { MatFormField, MatFormFieldModule } from "@angular/material/form-field";
+import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
 import { CredentialService } from "@services/credential.service";
 import { DeeplinkInput } from "../deeplink-input/deeplink-input";
@@ -18,7 +18,7 @@ import { HolderKeyService } from "@services/holder-key.service";
 import { Router } from "@angular/router";
 
 @Component({
-  selector: "app-credential-verification-v1",
+  selector: "app-credential-verification-v2",
   imports: [
     PanelComponent,
     ChecklistEntry,
@@ -28,7 +28,6 @@ import { Router } from "@angular/router";
     SlicePipe,
     CommonModule,
     MatFormFieldModule,
-    MatFormField,
     MatInputModule,
     FormsModule,
     DeeplinkInput,
@@ -36,18 +35,18 @@ import { Router } from "@angular/router";
     MatCardTitle,
     MatCardContent,
   ],
-  templateUrl: "./credential-verification-v1.html",
+  templateUrl: "./credential-verification-v2.html",
   standalone: true,
 })
-export class CredentialVerificationV1 {
+export class CredentialVerificationV2 {
   readonly panelOpenState = signal(false);
   public input =
-    "swiyu-verify://?client_id=did%3Atdw%3AQmcsWxATnPMAcbjukjXAkVAUAKRSC71mjMWjod4NVWrZ9Y%3Amockserver%253A1080%3Aapi%3Av1%3Adid%3A64f74058-4fa3-4609-a7b4-dd6a8853bc32&request_uri=http%3A%2F%2Fdefault-verifier-url.admin.ch%2Foid4vp%2Fapi%2Frequest-object%2F9eafca2d-9bae-46a2-a81d-f3576809d2c0";
+    "swiyu-verify://?client_id=did%3Atdw%3AQmcsWxATnPMAcbjukjXAkVAUAKRSC71mjMWjod4NVWrZ9Y%3Amockserver%253A1080%3Aapi%3Av2%3Adid%3A64f74058-4fa3-4609-a7b4-dd6a8853bc32&request_uri=http%3A%2F%2Fdefault-verifier-url.admin.ch%2Foid4vp%2Fapi%2Frequest-object%2F9eafca2d-9bae-46a2-a81d-f3576809d2c0";
 
   deeplink: WritableSignal<undefined | any> = signal(undefined);
   requestObject: WritableSignal<undefined | any> = signal(undefined);
-  presentationDefinition: WritableSignal<undefined | any> = signal(undefined);
-  requiredClaims: WritableSignal<undefined | any[]> = signal(undefined);
+  dcqlQuery: WritableSignal<undefined | any> = signal(undefined);
+  requiredCredentials: WritableSignal<undefined | any[]> = signal(undefined);
   credentialInput: WritableSignal<string> = signal("");
   vpToken: WritableSignal<undefined | string> = signal(undefined);
   responseSubmitted: WritableSignal<boolean> = signal(false);
@@ -56,11 +55,9 @@ export class CredentialVerificationV1 {
   credentialValidationError: WritableSignal<string | undefined> = signal(undefined);
   decodedHeader: WritableSignal<any> = signal(undefined);
   decodedPayload: WritableSignal<any> = signal(undefined);
-  presentedClaims: WritableSignal<any> = signal(undefined);
 
   constructor(
     private apiService: ApiService,
-    private credentialService: CredentialService,
     private verificationService: VerificationService,
     private holderKeyService: HolderKeyService,
     private router: Router
@@ -83,23 +80,33 @@ export class CredentialVerificationV1 {
       this.verificationService.decodeDeeplink(input);
     this.deeplink.set(decodedDeeplink);
 
-    const credentialString = this.credentialInput();
-    if (!credentialString || credentialString.trim() === "") {
-      console.error("No credential provided");
-      return;
-    }
 
     this.apiService
       .resolveRequestObjectFromDeeplink(decodedDeeplink?.request_uri)
       .pipe(
         switchMap((requestObject: any) => {
           this.requestObject.set(requestObject);
-          this.presentationDefinition.set(requestObject?.presentation_definition);
+          this.dcqlQuery.set(requestObject?.dcql_query);
 
-          const requiredClaims = this.verificationService.extractRequiredClaimsFromPresentationDefinition(
-            requestObject?.presentation_definition
+          const requiredCredentials = this.verificationService.extractCredentialsFromDCQL(
+            requestObject?.dcql_query
           );
-          this.requiredClaims.set(requiredClaims);
+          this.requiredCredentials.set(requiredCredentials);
+
+          const credentialString = this.credentialInput();
+          if (!credentialString || credentialString.trim() === "") {
+            console.error("No credential provided");
+            return of(null);
+          }
+
+          const requiredFields = this.extractFieldPathsFromDCQL(requestObject?.dcql_query);
+          const payloadJson = this.extractPayloadFromSdJwt(credentialString);
+          const validationErrors = this.validateRequiredFields(requiredFields, payloadJson);
+
+          if (validationErrors.length > 0) {
+            this.credentialValidationError.set(`Missing required fields: ${validationErrors.join(', ')}`);
+            return of(null);
+          }
 
           const clientId = requestObject?.client_id;
 
@@ -114,19 +121,18 @@ export class CredentialVerificationV1 {
             return of(null);
           }
           this.vpToken.set(vpToken);
-          const presentationSubmission = this.createPresentationSubmission(
-            this.requestObject()?.presentation_definition
-          );
+          const dcqlCredentials = this.dcqlQuery()?.credentials || [];
+          const credentialId = dcqlCredentials[0]?.id || "credential_1";
 
-          return this.apiService.submitVerificationResponse(
+          return this.apiService.submitVerificationResponseDcql(
             this.requestObject()?.response_uri,
             vpToken,
-            presentationSubmission
+            credentialId
           );
         })
       )
       .subscribe({
-        next: (response) => {
+        next: () => {
           this.responseSubmitted.set(true);
         },
         error: (error) => {
@@ -138,15 +144,14 @@ export class CredentialVerificationV1 {
   public reset(): void {
     this.deeplink.set(undefined);
     this.requestObject.set(undefined);
-    this.presentationDefinition.set(undefined);
-    this.requiredClaims.set(undefined);
+    this.dcqlQuery.set(undefined);
+    this.requiredCredentials.set(undefined);
     this.vpToken.set(undefined);
     this.responseSubmitted.set(false);
     this.credentialValid.set(false);
     this.credentialValidationError.set(undefined);
     this.decodedHeader.set(undefined);
     this.decodedPayload.set(undefined);
-    this.presentedClaims.set(undefined);
   }
 
   private validateCredential(): boolean {
@@ -199,17 +204,26 @@ export class CredentialVerificationV1 {
     }
   }
 
+  private base64UrlDecode(input: string): Uint8Array {
+    const padded = input + '=='.substring(0, (4 - input.length % 4) % 4);
+    const binary = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  }
+
   private async createAndSignPresentation(
     credentialString: string,
     verifierId: string,
     nonce: string
   ): Promise<string> {
-
     const originalSdJwt = credentialString;
 
-    const requiredFields = this.extractFieldPathsFromPresentationDefinition(
-      this.requestObject()?.presentation_definition
-    );
+    const requiredFields = this.extractFieldPathsFromDCQL(this.dcqlQuery());
+
+
 
     const selectiveDisclosureSdJwt = await this.createSelectiveDisclosureSdJwt(
       originalSdJwt,
@@ -239,194 +253,152 @@ export class CredentialVerificationV1 {
     return vpToken;
   }
 
+  private extractFieldPathsFromDCQL(dcqlQuery: any): string[] {
+    const DISCLOSURE_EXCLUDED = new Set(['iss', 'nbf', 'exp', 'cnf', 'status']);
+    const fieldPaths: string[] = [];
+
+    if (!dcqlQuery?.credentials) {
+      return fieldPaths;
+    }
+
+    dcqlQuery.credentials.forEach((credential: any) => {
+      credential.claims?.forEach((claim: any) => {
+        if (claim.path && Array.isArray(claim.path)) {
+          claim.path.forEach((pathElement: any) => {
+            if (typeof pathElement === 'string') {
+              const claimName = pathElement.replace(/^\$\./, '');
+              if (!DISCLOSURE_EXCLUDED.has(claimName)) {
+                if (!fieldPaths.includes(claimName)) {
+                  fieldPaths.push(claimName);
+                }
+              }
+            }
+          });
+        }
+      });
+    });
+
+    console.log("DCQL – Extracted required fields:", fieldPaths);
+    return fieldPaths;
+  }
+
+
+
   private async calculateSdHash(sdJwtPresentation: string): Promise<string> {
     const encoder = new TextEncoder();
     const data = encoder.encode(sdJwtPresentation);
 
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-
     const hashArray = Array.from(new Uint8Array(hashBuffer));
 
-    const hashBase64Standard = btoa(String.fromCharCode.apply(null, hashArray));
+    const hashBase64Standard = btoa(String.fromCharCode.apply(null, hashArray as any));
 
     const hashBase64Url = hashBase64Standard
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
       .replace(/=/g, '');
 
-
     return hashBase64Url;
-  }
-
-  private createPresentationSubmission(presentationDefinition: any): any {
-    if (!presentationDefinition?.input_descriptors) {
-      return {
-        id: "presentation_submission",
-        definition_id: presentationDefinition?.id || "default",
-        descriptor_map: []
-      };
-    }
-
-    const descriptorMap = presentationDefinition.input_descriptors.map((descriptor: any) => ({
-      id: descriptor.id,
-      format: "vc+sd-jwt",
-      path: "$"
-    }));
-
-    return {
-      id: presentationDefinition?.id || "presentation_submission",
-      definition_id: presentationDefinition?.id || "default",
-      descriptor_map: descriptorMap
-    };
-  }
-
-  private extractFieldPathsFromPresentationDefinition(presentationDefinition: any): string[] {
-    const fieldPaths: string[] = [];
-
-    if (!presentationDefinition) {
-      return fieldPaths;
-    }
-
-    if (presentationDefinition.input_descriptors) {
-      presentationDefinition.input_descriptors.forEach((descriptor: any) => {
-        if (descriptor.constraints?.fields) {
-          descriptor.constraints.fields.forEach((field: any) => {
-            if (field.path && Array.isArray(field.path)) {
-              field.path.forEach((path: string) => {
-                const claimName = path.replace(/^\$\./, '');
-                if (claimName && !fieldPaths.includes(claimName)) {
-                  fieldPaths.push(claimName);
-                }
-              });
-            }
-          });
-        }
-      });
-    }
-
-    return fieldPaths;
   }
 
   private async createSelectiveDisclosureSdJwt(
     fullSdJwt: string,
     requiredFields: string[]
   ): Promise<string> {
-    try {
-      const parts = fullSdJwt.split('~');
-      const jwtPart = parts[0];
-      const disclosureParts = parts.slice(1, -1);
-      if (disclosureParts.length === 0) {
-        const [, payloadB64] = jwtPart.split('.');
-        const payloadJson = JSON.parse(
+    const DISCLOSURE_EXCLUDED = new Set(['iss', 'nbf', 'exp', 'cnf', 'status']);
+
+    const parts = fullSdJwt.split('~');
+    const jwtPart = parts[0];
+    const disclosureParts = parts.slice(1, -1);
+
+    const selectedDisclosures: string[] = [];
+    const foundClaims: string[] = [];
+    const disclosureDetails: any[] = [];
+
+    disclosureParts.forEach((disclosure: string, index: number) => {
+      try {
+        if (!disclosure) return;
+
+        const decodedDisclosure = JSON.parse(
           new TextDecoder().decode(
-            this.base64UrlDecode(payloadB64)
+            this.base64UrlDecode(disclosure)
           )
         );
-        return await this.createSdJwtWithDisclosures(jwtPart, payloadJson, requiredFields);
-      }
 
-      const selectedDisclosures: string[] = [];
+        if (Array.isArray(decodedDisclosure) && decodedDisclosure.length >= 2) {
+          const claimName = decodedDisclosure[1];
 
-      disclosureParts.forEach((disclosure: string, index: number) => {
-        try {
-          if (!disclosure) {
-            console.warn("Empty disclosure at index:", index);
+          if (DISCLOSURE_EXCLUDED.has(claimName)) {
             return;
           }
 
-          const decodedDisclosure = JSON.parse(
-            new TextDecoder().decode(
-              this.base64UrlDecode(disclosure)
-            )
-          );
-
-          if (Array.isArray(decodedDisclosure) && decodedDisclosure.length >= 2) {
-            const claimName = decodedDisclosure[1];
-            if (requiredFields.includes(claimName)) {
-              selectedDisclosures.push(disclosure);
-            }
+          if (requiredFields.includes(claimName)) {
+            selectedDisclosures.push(disclosure);
+            foundClaims.push(claimName);
+            disclosureDetails.push({
+              claimName,
+              value: decodedDisclosure[2],
+              encoded: disclosure.substring(0, 30) + "..."
+            });
           }
-        } catch (e) {
-          console.warn("Could not parse disclosure at index", index, ":", e);
         }
-      });
-
-      let presentation = jwtPart;
-      if (selectedDisclosures.length > 0) {
-        presentation += '~' + selectedDisclosures.join('~') + '~';
-      } else {
-        presentation += '~';
-      }
-      return presentation;
-
-    } catch (error) {
-      console.error("Error creating selective disclosure SD-JWT:", error);
-      return fullSdJwt;
-    }
-  }
-
-  private async createSdJwtWithDisclosures(
-    jwtPart: string,
-    payloadJson: any,
-    requiredFields: string[]
-  ): Promise<string> {
-    const disclosures: string[] = [];
-
-    requiredFields.forEach((fieldName: string) => {
-      if (fieldName in payloadJson) {
-        const value = payloadJson[fieldName];
-        const salt = this.generateRandomSalt();
-
-        const disclosure = [salt, fieldName, value];
-        const disclosureJson = JSON.stringify(disclosure);
-        const disclosureB64Url = this.base64UrlEncode(disclosureJson);
-
-        disclosures.push(disclosureB64Url);
+      } catch (e) {
+        console.warn(`Failed to parse disclosure ${index}:`, e);
       }
     });
 
-    let sdJwtWithDisclosures = jwtPart;
-    if (disclosures.length > 0) {
-      sdJwtWithDisclosures += '~' + disclosures.join('~') + '~';
+    let presentation = jwtPart;
+    if (selectedDisclosures.length > 0) {
+      presentation += '~' + selectedDisclosures.join('~') + '~';
     } else {
-      sdJwtWithDisclosures += '~';
+      presentation += '~';
     }
 
-    return sdJwtWithDisclosures;
+    console.log("Final presentation format: JWT~disc1~disc2~...~");
+    return presentation;
   }
 
-  private generateRandomSalt(): string {
-    const saltBytes = new Uint8Array(16);
-    crypto.getRandomValues(saltBytes);
-    let binary = '';
-    for (let i = 0; i < saltBytes.length; i++) {
-      binary += String.fromCharCode(saltBytes[i]);
+
+
+  private extractPayloadFromSdJwt(sdJwt: string): any {
+    try {
+      const parts = sdJwt.split('~');
+      const jwtPart = parts[0];
+      const [, payloadB64] = jwtPart.split('.');
+      return JSON.parse(
+        new TextDecoder().decode(this.base64UrlDecode(payloadB64))
+      );
+    } catch (error) {
+      console.error("Failed to extract payload from SD-JWT:", error);
+      return {};
     }
-    return btoa(binary)
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
   }
 
-  private base64UrlEncode(input: string): string {
-    const bytes = new TextEncoder().encode(input);
-    let binary = '';
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i]);
+  private validateRequiredFields(requiredFields: string[], payloadJson: any): string[] {
+    const RESERVED_CLAIMS = new Set(['iss', 'nbf', 'exp', 'cnf', 'vct', 'status']);
+    const missingFields: string[] = [];
+
+    requiredFields.forEach((field) => {
+      if (RESERVED_CLAIMS.has(field)) {
+        return;
+      }
+
+      if (field in payloadJson) {
+        return;
+      }
+
+      if (payloadJson._sd && Array.isArray(payloadJson._sd) && payloadJson._sd.length > 0) {
+        return;
+      }
+
+      missingFields.push(field);
+    });
+
+    if (missingFields.length > 0) {
+      console.warn("Missing required fields:", missingFields);
     }
-    return btoa(binary)
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
+
+    return missingFields;
   }
 
-  private base64UrlDecode(input: string): Uint8Array {
-    const padded = input + '=='.substring(0, (4 - input.length % 4) % 4);
-    const binary = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    return bytes;
-  }
 }

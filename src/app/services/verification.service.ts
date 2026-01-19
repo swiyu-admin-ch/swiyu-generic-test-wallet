@@ -24,7 +24,6 @@ export class VerificationService {
                 result[key] = value;
             });
 
-            console.log("Decoded deeplink:", result);
             return result;
         }
         return null;
@@ -50,7 +49,6 @@ export class VerificationService {
             .setExpirationTime('2h')
             .sign(privateKey);
 
-        console.log(jwt);
         return jwt;
     }
 
@@ -102,6 +100,24 @@ export class VerificationService {
         return requiredClaims;
     }
 
+    public extractCredentialsFromDCQL(dcqlQuery: any): any[] {
+        if (!dcqlQuery?.credentials) {
+            return [];
+        }
+
+        const credentials: any[] = [];
+
+        dcqlQuery.credentials.forEach((credential: any) => {
+            credentials.push({
+                id: credential.id,
+                format: credential.format,
+                meta: credential.meta || {}
+            });
+        });
+
+        return credentials;
+    }
+
     public async createVerifiablePresentation(
         credential: string,
         verifierId: string,
@@ -127,7 +143,6 @@ export class VerificationService {
             .setExpirationTime('2h')
             .sign(privateKey);
 
-        console.log("VP Token created:", vpToken);
         return vpToken;
     }
 }

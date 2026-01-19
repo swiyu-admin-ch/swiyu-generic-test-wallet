@@ -12,10 +12,11 @@ import { MatAccordion } from "@angular/material/expansion";
 import { JsonPipe } from "@angular/common";
 import { MatFormField, MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
-import { CredentialService } from "../creddential.service";
+import { CredentialService } from "@services/credential.service";
 import { MatButton } from "@angular/material/button";
 import { DeeplinkInput } from "../deeplink-input/deeplink-input";
 import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
+import { HolderKeyService } from "@services/holder-key.service";
 
 @Component({
   selector: "app-credential-issuance-v2",
@@ -39,7 +40,7 @@ import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
   templateUrl: "./credential-issuance-v2.html",
   standalone: true,
 })
-export class CredentialIssuanceV2 implements OnInit {
+export class CredentialIssuanceV2 {
   readonly panelOpenState = signal(false);
   public input =
     "swiyu://?credential_offer=%7B%22grants%22%3A%7B%22urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Apre-authorized_code%22%3A%7B%22pre-authorized_code%22%3A%225c2ce09c-44ac-45a1-9d25-d066dd8ad277%22%7D%7D%2C%22version%22%3A%221.0%22%2C%22credential_issuer%22%3A%22https%3A%2F%2Fbcs.admin.ch%2Fbcs-web%2Fissuer-agent%2Foid4vci%22%2C%22credential_configuration_ids%22%3A%5B%22betaid-sdjwt%22%5D%7D";
@@ -54,13 +55,10 @@ export class CredentialIssuanceV2 implements OnInit {
   decodedHeader: WritableSignal<undefined | any> = signal(undefined);
   registryEntry: WritableSignal<undefined | any[]> = signal(undefined);
 
-  private publicKey: CryptoKey;
-  private privateKey: CryptoKey;
-  private jwk: JWK;
-
   constructor(
     private apiService: ApiService,
-    private credentialService: CredentialService
+    private credentialService: CredentialService,
+    private holderKeyService: HolderKeyService
   ) {}
 
   public onResolve(input: string): void {
@@ -156,11 +154,6 @@ export class CredentialIssuanceV2 implements OnInit {
       true,
       ["sign", "verify"]
     );
-
-    this.publicKey = publicKey;
-    this.privateKey = privateKey;
-
-    this.jwk = await jose.exportJWK(this.publicKey);
   }
 
   public reset(): void {
@@ -212,8 +205,8 @@ export class CredentialIssuanceV2 implements OnInit {
       this.metadata()?.credential_issuer,
       nonce,
       proofSigningAlgValuesSupported,
-      this.privateKey,
-      this.jwk
+      this.holderKeyService.getPrivateKey(),
+      this.holderKeyService.getJwk()
     );
 
     return {

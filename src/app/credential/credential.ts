@@ -23,6 +23,9 @@ import {
   MatGridTileHeaderCssMatStyler,
 } from "@angular/material/grid-list";
 import { DeeplinkInput } from "../deeplink-input/deeplink-input";
+import { MatButton } from "@angular/material/button";
+import { MatIcon } from "@angular/material/icon";
+import { Router } from "@angular/router";
 
 @Component({
   selector: "app-credential",
@@ -43,6 +46,8 @@ import { DeeplinkInput } from "../deeplink-input/deeplink-input";
     MatGridTile,
     MatGridTileHeaderCssMatStyler,
     DeeplinkInput,
+    MatButton,
+    MatIcon,
   ],
   templateUrl: "./credential.html",
   styleUrl: "./credential.css",
@@ -55,7 +60,7 @@ export class Credential implements OnChanges {
   decodedPayload: WritableSignal<any> = signal(undefined);
   disclosures = signal([]);
 
-  constructor(private apiService: ApiService) {}
+  constructor(private apiService: ApiService, private router: Router) {}
 
   async getCredentialDetails(): Promise<void> {
     const token = this.encodedCredential.split("~");
@@ -119,5 +124,24 @@ export class Credential implements OnChanges {
     // decode to bytes and decode UTF-8
     const bytes = Uint8Array.from(atob(input), (c) => c.charCodeAt(0));
     return new TextDecoder().decode(bytes);
+  }
+
+  public copyCredentialToClipboard(): void {
+    if (this.encodedCredential) {
+      navigator.clipboard.writeText(this.encodedCredential).then(
+        () => {
+          console.log("Credential copied to clipboard");
+        },
+        () => {
+          console.error("Failed to copy credential to clipboard");
+        }
+      );
+    }
+  }
+
+  public goToVerification(version: string): void {
+    this.router.navigate([`/verifications/${version}`], {
+      state: { credential: this.encodedCredential }
+    });
   }
 }

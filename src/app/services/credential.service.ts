@@ -44,7 +44,6 @@ export class CredentialService {
             .setExpirationTime('2h')
             .sign(privateKey);
 
-        console.log(jwt);
         return jwt;
     }
 
@@ -60,21 +59,6 @@ export class CredentialService {
         return {payload, protectedHeader};
     }
 
-    public async createKeySet(): Promise<{ publicKey: CryptoKey, privateKey: CryptoKey, jwk: jose.JWK }> {
-        const {publicKey, privateKey} = await crypto.subtle.generateKey(
-            {
-                name: "ECDSA",
-                namedCurve: "P-256",
-            },
-            true,
-            ["sign", "verify"]);
-
-        const jwk = await jose.exportJWK(publicKey);
-
-        console.log("NEW KEY SET GENERATED");
-
-        return {publicKey: publicKey, privateKey: privateKey, jwk: jwk}
-    }
 
     private getCredentialOfferString(deeplink: string): string {
         return deeplink.split('credential_offer=')[1];

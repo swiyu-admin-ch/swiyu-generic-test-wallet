@@ -16,8 +16,6 @@ export class ApiService {
   public resolveOpenIdMetadataFromDeeplink(
     issuerCredentialUrl: string
   ): Observable<any> {
-    console.log("issuerCredentialUrl", issuerCredentialUrl);
-
     return this.http
       .get<any>(`${issuerCredentialUrl}/.well-known/openid-credential-issuer`, {
         responseType: "json",
@@ -45,8 +43,6 @@ export class ApiService {
     if (!verifierRequestObjectUrl) {
       return throwError(() => new Error("No verifier request object URL provided"));
     }
-
-    console.log("Resolving", verifierRequestObjectUrl)
 
     return this.http
       .get<any>(`${verifierRequestObjectUrl}`, {
@@ -174,15 +170,13 @@ export class ApiService {
   }
 
   public submitVerificationResponse(
-    responseUri: string,
+    responseDataUri: string,
     vpToken: string,
     presentationSubmission: any
   ): Observable<any> {
-    if (!responseUri) {
+    if (!responseDataUri) {
       return throwError(() => new Error("No response_uri provided"));
     }
-
-    const responseDataUri = `${responseUri}/response-data`;
 
     const body = new HttpParams()
       .set("presentation_submission", JSON.stringify(presentationSubmission))
@@ -202,6 +196,40 @@ export class ApiService {
         catchError((error) => {
           console.error("Error submitting verification response:", error);
           return throwError(() => new Error("Failed to submit verification response"));
+        })
+      );
+  }
+
+  public submitVerificationResponseDcql(
+    responseDataUri: string,
+    vpToken: string,
+    credentialId: string = "credential_1"
+  ): Observable<any> {
+    if (!responseDataUri) {
+      return throwError(() => new Error("No response_uri provided"));
+    }
+
+    const vpTokenMap: { [key: string]: string[] } = {};
+    vpTokenMap[credentialId] = [vpToken];
+    const vpTokenJson = JSON.stringify(vpTokenMap);
+
+    const body = new HttpParams()
+      .set("vp_token", vpTokenJson);
+
+    const headers = new HttpHeaders({
+      "Content-Type": "application/x-www-form-urlencoded",
+      "SWIYU-API-Version": "2"
+    });
+
+    return this.http
+      .post(responseDataUri, body.toString(), {
+        headers: headers,
+        responseType: "text" as any
+      })
+      .pipe(
+        catchError((error) => {
+          console.error("DCQL submission failed:", error);
+          return throwError(() => new Error("Failed to submit DCQL verification response"));
         })
       );
   }
