@@ -27,6 +27,9 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci --include=dev
+      - name: Ensure Angular builder is present
+        run: |
+          npm ls @angular-devkit/build-angular || npm install --no-save @angular-devkit/build-angular@^20.3.6
       - name: Install Angular CLI
         run: npm install -g @angular/cli
       - name: Set Pages base href
