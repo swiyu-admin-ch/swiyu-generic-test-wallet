@@ -32,7 +32,7 @@ jobs:
       - name: Set Pages base href
         run: echo "REPO_NAME=${GITHUB_REPOSITORY#*/}" >> $GITHUB_ENV
       - name: Build Angular app
-        run: npm run build -- --configuration production --base-href "/${REPO_NAME}/"
+        run: npm run build -- --base-href "/${REPO_NAME}/"
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
