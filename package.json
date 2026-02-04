@@ -6,7 +6,8 @@
     "ng": "ng",
     "start": "ng serve --proxy-config proxy.conf.json",
     "build": "ng build --configuration production",
-    "test": "ng test --watch=false"
+    "test": "ng test --watch=false",
+    "lint": "ng lint"
   },
   "dependencies": {
     "@angular-devkit/build-angular": "^20.3.6",
@@ -31,6 +32,9 @@
     "@angular/cli": "^20.0.0",
     "@angular/compiler-cli": "^20.0.0",
     "@types/jest": "^30.0.0",
-    "typescript": "^5.9.3"
+    "angular-eslint": "21.0.1",
+    "eslint": "^9.39.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "8.46.4"
   }
 }

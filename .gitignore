@@ -1,2 +1,8 @@
 node_modules
 .angular
+
+
+### Code QL ###
+/codeql/
+/swiyu-wallet-test-codeql-db/
+codeql-results.sarif
