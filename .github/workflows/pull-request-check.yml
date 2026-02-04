@@ -30,8 +30,13 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: |
-          npm ci --legacy-peer-deps --no-audit --no-fund
+        run: npm ci --include=dev --legacy-peer-deps --no-audit --no-fund
+      - name: Ensure Angular builder
+        run: npm install --no-save --legacy-peer-deps --force @angular-devkit/build-angular@20.3.6
+      - name: Ensure Angular build package
+        run: npm install --no-save --legacy-peer-deps --force @angular/build@20.3.6
+      - name: Install Angular CLI
+        run: npm install -g @angular/cli@20.3.6
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
