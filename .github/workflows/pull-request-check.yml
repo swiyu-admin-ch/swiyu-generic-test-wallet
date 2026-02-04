@@ -74,3 +74,10 @@ jobs:
         with:
           sarif_file: trivy-results.sarif
           category: trivy-scan
+
+      - name: Archive npm logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-logs
+          path: /home/runner/.npm/_logs
