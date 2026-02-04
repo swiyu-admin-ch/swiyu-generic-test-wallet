@@ -29,11 +29,6 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Force stable npm version
-        run: |
-          npm install -g npm@10.5.2
-          npm --version
-
       - name: Install dependencies
         run: npm install --legacy-peer-deps --no-audit --no-fund
 
