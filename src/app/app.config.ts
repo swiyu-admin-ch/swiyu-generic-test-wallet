@@ -1,13 +1,13 @@
 import {provideHttpClient, withFetch} from "@angular/common/http";
 import {ApplicationConfig, APP_INITIALIZER} from "@angular/core";
-import {provideRouter} from "@angular/router";
+import {provideRouter, withHashLocation} from "@angular/router";
 import {routes} from "../routes";
 import {HolderKeyService} from "@services/holder-key.service";
 
 export const appConfig: ApplicationConfig = {
     providers: [
         provideHttpClient(withFetch()),
-        provideRouter(routes),
+        provideRouter(routes, withHashLocation()),
         HolderKeyService,
         {
             provide: APP_INITIALIZER,
