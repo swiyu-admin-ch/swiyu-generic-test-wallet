@@ -151,6 +151,32 @@ export class ApiService {
       .pipe(catchError(this.handleError));
   }
 
+  public getCredentialV2WithEncryption(
+    issuerCredentialUrl: string,
+    bearerToken: string,
+    payload: any,
+    isEncrypted: boolean = false
+  ): any {
+    if (!issuerCredentialUrl) {
+      return "No issuer_credential_url provided";
+    }
+
+    const headers = new HttpHeaders({
+      Authorization: `Bearer ${bearerToken}`,
+      "SWIYU-API-Version": "2",
+      "Content-Type": isEncrypted ? "application/jwt" : "application/json"
+    });
+
+    const bodyToSend = isEncrypted ? payload : payload;
+
+    return this.http
+      .post<any>(issuerCredentialUrl, bodyToSend, {
+        responseType: isEncrypted ? ("text" as any) : "json",
+        headers: headers,
+      })
+      .pipe(catchError(this.handleError));
+  }
+
   public getRegistryEntry(registryEntryUrl: string): Observable<any[]> {
     const url = this.getRegistryEntryLocation(registryEntryUrl);
     return this.http.get<any>(url).pipe(catchError(this.handleError));
