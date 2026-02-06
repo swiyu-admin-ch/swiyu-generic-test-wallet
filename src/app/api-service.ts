@@ -203,7 +203,9 @@ export class ApiService {
   public submitVerificationResponseDcql(
     responseDataUri: string,
     vpToken: string,
-    credentialId: string = "credential_1"
+    credentialId: string = "credential_1",
+    encryptionRequired: boolean = false,
+    clientMetadata?: any
   ): Observable<any> {
     if (!responseDataUri) {
       return throwError(() => new Error("No response_uri provided"));
@@ -213,8 +215,13 @@ export class ApiService {
     vpTokenMap[credentialId] = [vpToken];
     const vpTokenJson = JSON.stringify(vpTokenMap);
 
-    const body = new HttpParams()
-      .set("vp_token", vpTokenJson);
+    const body = new HttpParams();
+
+    if (encryptionRequired && clientMetadata) {
+      body.set("response", vpTokenJson);
+    } else {
+      body.set("vp_token", vpTokenJson);
+    }
 
     const headers = new HttpHeaders({
       "Content-Type": "application/x-www-form-urlencoded",
@@ -230,6 +237,35 @@ export class ApiService {
         catchError((error) => {
           console.error("DCQL submission failed:", error);
           return throwError(() => new Error("Failed to submit DCQL verification response"));
+        })
+      );
+  }
+
+  public submitVerificationResponseDcqlEncrypted(
+    responseDataUri: string,
+    encryptedJwe: string
+  ): Observable<any> {
+    if (!responseDataUri) {
+      return throwError(() => new Error("No response_uri provided"));
+    }
+
+    const body = new HttpParams()
+      .set("response", encryptedJwe);
+
+    const headers = new HttpHeaders({
+      "Content-Type": "application/x-www-form-urlencoded",
+      "SWIYU-API-Version": "2"
+    });
+
+    return this.http
+      .post(responseDataUri, body.toString(), {
+        headers: headers,
+        responseType: "text" as any
+      })
+      .pipe(
+        catchError((error) => {
+          console.error("Encrypted DCQL submission failed:", error);
+          return throwError(() => new Error("Failed to submit encrypted DCQL verification response"));
         })
       );
   }

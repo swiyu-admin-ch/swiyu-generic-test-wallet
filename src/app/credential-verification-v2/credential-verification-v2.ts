@@ -1,8 +1,8 @@
 import { Component, signal, WritableSignal } from "@angular/core";
-import { SignJWT } from "jose";
+import { SignJWT, CompactEncrypt, importJWK } from "jose";
 import { ApiService } from "../api-service";
 import { FormsModule } from "@angular/forms";
-import { from, of, switchMap } from "rxjs";
+import { from, of, switchMap, throwError } from "rxjs";
 import { PanelComponent } from "../deeplink-resolver/panel.component";
 import { ChecklistEntry } from "../checklist-entry/checklist-entry";
 import { MatList } from "@angular/material/list";
@@ -10,7 +10,6 @@ import { MatAccordion } from "@angular/material/expansion";
 import { JsonPipe, SlicePipe, CommonModule } from "@angular/common";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
-import { CredentialService } from "@services/credential.service";
 import { DeeplinkInput } from "../deeplink-input/deeplink-input";
 import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { VerificationService } from "@services/verification.service";
@@ -56,6 +55,14 @@ export class CredentialVerificationV2 {
   decodedHeader: WritableSignal<any> = signal(undefined);
   decodedPayload: WritableSignal<any> = signal(undefined);
 
+  // Encryption related signals
+  encryptionRequired: WritableSignal<boolean> = signal(false);
+  encryptionSupported: WritableSignal<boolean> = signal(false);
+  encryptionAlgorithm: WritableSignal<string | undefined> = signal(undefined);
+  encryptionMethod: WritableSignal<string | undefined> = signal(undefined);
+  encryptedResponse: WritableSignal<string | undefined> = signal(undefined);
+  encryptionError: WritableSignal<string | undefined> = signal(undefined);
+
   constructor(
     private apiService: ApiService,
     private verificationService: VerificationService,
@@ -87,6 +94,8 @@ export class CredentialVerificationV2 {
         switchMap((requestObject: any) => {
           this.requestObject.set(requestObject);
           this.dcqlQuery.set(requestObject?.dcql_query);
+
+          this.checkEncryptionRequirements(requestObject);
 
           const requiredCredentials = this.verificationService.extractCredentialsFromDCQL(
             requestObject?.dcql_query
@@ -124,11 +133,29 @@ export class CredentialVerificationV2 {
           const dcqlCredentials = this.dcqlQuery()?.credentials || [];
           const credentialId = dcqlCredentials[0]?.id || "credential_1";
 
-          return this.apiService.submitVerificationResponseDcql(
-            this.requestObject()?.response_uri,
-            vpToken,
-            credentialId
-          );
+          if (this.encryptionRequired()) {
+            return from(this.encryptPayload(vpToken, this.requestObject()?.client_metadata))
+              .pipe(
+                switchMap((encryptedToken: string | null) => {
+                  if (!encryptedToken) {
+                    console.error("Failed to encrypt payload");
+                    return throwError(() => new Error("Encryption failed"));
+                  }
+                  return this.apiService.submitVerificationResponseDcqlEncrypted(
+                    this.requestObject()?.response_uri,
+                    encryptedToken
+                  );
+                })
+              );
+          } else {
+            return this.apiService.submitVerificationResponseDcql(
+              this.requestObject()?.response_uri,
+              vpToken,
+              credentialId,
+              false,
+              undefined
+            );
+          }
         })
       )
       .subscribe({
@@ -152,6 +179,12 @@ export class CredentialVerificationV2 {
     this.credentialValidationError.set(undefined);
     this.decodedHeader.set(undefined);
     this.decodedPayload.set(undefined);
+    this.encryptionRequired.set(false);
+    this.encryptionSupported.set(false);
+    this.encryptionAlgorithm.set(undefined);
+    this.encryptionMethod.set(undefined);
+    this.encryptedResponse.set(undefined);
+    this.encryptionError.set(undefined);
   }
 
   private validateCredential(): boolean {
@@ -399,6 +432,89 @@ export class CredentialVerificationV2 {
     }
 
     return missingFields;
+  }
+
+  private checkEncryptionRequirements(requestObject: any): void {
+    const responseMode = requestObject?.response_mode;
+    const clientMetadata = requestObject?.client_metadata;
+
+    const isDirectPostJwt = responseMode === "direct_post.jwt";
+
+    const hasEncryptionJwks = clientMetadata?.jwks?.keys && clientMetadata.jwks.keys.length > 0;
+    const hasEncryptionMethods = clientMetadata?.encrypted_response_enc_values_supported &&
+                                  clientMetadata.encrypted_response_enc_values_supported.length > 0;
+
+    const encryptionRequired = isDirectPostJwt && hasEncryptionJwks && hasEncryptionMethods;
+
+    this.encryptionRequired.set(encryptionRequired);
+
+    if (encryptionRequired) {
+      try {
+        const encryptionJwk = clientMetadata.jwks.keys[0];
+        const encryptionAlg = encryptionJwk.alg || "ECDH-ES";
+        const encryptionEnc = clientMetadata.encrypted_response_enc_values_supported[0] || "A128GCM";
+
+        this.encryptionAlgorithm.set(encryptionAlg);
+        this.encryptionMethod.set(encryptionEnc);
+        this.encryptionSupported.set(true);
+
+        console.log("Encryption requirements detected:", {
+          algorithm: encryptionAlg,
+          method: encryptionEnc,
+          keyType: encryptionJwk.kty,
+          curve: encryptionJwk.crv
+        });
+      } catch (error) {
+        this.encryptionError.set("Failed to parse encryption requirements: " + (error as Error).message);
+        console.error("Error parsing encryption requirements:", error);
+      }
+    }
+  }
+
+  public async encryptPayload(vpToken: string, clientMetadata: any): Promise<string | null> {
+    try {
+      if (!clientMetadata?.jwks?.keys || clientMetadata.jwks.keys.length === 0) {
+        this.encryptionError.set("No encryption keys available");
+        return null;
+      }
+
+      const encryptionJwk = clientMetadata.jwks.keys[0];
+      const encryptionAlg = encryptionJwk.alg || "ECDH-ES";
+      const encryptionEnc = clientMetadata.encrypted_response_enc_values_supported?.[0] || "A128GCM";
+
+      const publicKey = await importJWK(encryptionJwk, encryptionAlg);
+
+      const dcqlCredentials = this.dcqlQuery()?.credentials || [];
+      const credentialId = dcqlCredentials[0]?.id || "credential_1";
+      const vpTokenMap: { [key: string]: string[] } = {
+        [credentialId]: [vpToken]
+      };
+
+      const payload = JSON.stringify({
+        vp_token: vpTokenMap
+      });
+
+      const encryptedJwe = await new CompactEncrypt(
+        new TextEncoder().encode(payload)
+      )
+        .setProtectedHeader({
+          alg: encryptionAlg,
+          enc: encryptionEnc,
+          typ: "JWT",
+          kid: encryptionJwk.kid
+        })
+        .encrypt(publicKey);
+
+      this.encryptedResponse.set(encryptedJwe);
+      console.log("Payload encrypted successfully");
+
+      return encryptedJwe;
+    } catch (error) {
+      const errorMessage = "Failed to encrypt payload: " + (error as Error).message;
+      this.encryptionError.set(errorMessage);
+      console.error("Encryption error:", error);
+      return null;
+    }
   }
 
 }
