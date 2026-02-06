@@ -1,6 +1,12 @@
 node_modules
 .angular
 
+### Intellij ###
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
 
 ### Code QL ###
 /codeql/
