@@ -1,2 +1,14 @@
 node_modules
 .angular
+
+### Intellij ###
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+### Code QL ###
+/codeql/
+/swiyu-wallet-test-codeql-db/
+codeql-results.sarif

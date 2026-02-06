@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2025 Swiss Confederation
+#
+# SPDX-License-Identifier: MIT
+
+name: "Advanced CodeQL Configuration for JavaScript/TypeScript"
+
+queries:
+  - name: javascript-security-extended
+    uses: javascript-security-extended
+  - name: javascript-security-and-quality
+    uses: javascript-security-and-quality
+
+# Additional queries for extended security analysis
+query-filters:
+  - include:
+      kind: problem
+  - include:
+      kind: path-problem
+  - include:
+      severity: ["error", "warning"]
+  - exclude:
+      id: java/deprecated-call
+
+# Extended analysis options
+disable-default-queries: false
+
+build-mode: manual
