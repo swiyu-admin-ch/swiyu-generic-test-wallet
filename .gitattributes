@@ -1,0 +1,23 @@
+* text=auto
+
+# JavaScript
+*.js text eol=lf
+
+# CSS
+*.css text eol=lf
+
+# Fonts
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.otf binary
+
+# Images
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg text
+
