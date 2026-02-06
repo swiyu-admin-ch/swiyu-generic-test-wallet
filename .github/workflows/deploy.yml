@@ -8,10 +8,6 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -23,30 +19,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-
-      - name: Clean workspace
-        run: |
-          rm -rf node_modules
-          rm -rf ~/.npm/_cacache
 
       - name: Install dependencies
-        run: npm ci --include=dev --legacy-peer-deps --no-audit --no-fund
-
-      - name: Set Pages base href
-        run: echo "REPO_NAME=${GITHUB_REPOSITORY#*/}" >> $GITHUB_ENV
+        run: npm ci
 
       - name: Build Angular app
-        run: npm run build -- --base-href "/${REPO_NAME}/"
-
-      - name: Verify build output
-        run: |
-          if [ ! -d "dist/test-wallet-frontend" ]; then
-            echo "Build output directory not found!"
-            exit 1
-          fi
-          echo "Build output directory exists"
-          ls -la dist/test-wallet-frontend
+        run: npm run build -- --configuration production --base-href "/${{ github.event.repository.name }}/"
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -54,8 +32,8 @@ jobs:
           path: dist/test-wallet-frontend
 
   deploy:
-    runs-on: ubuntu-latest
     needs: build
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
