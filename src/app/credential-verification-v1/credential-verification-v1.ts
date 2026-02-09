@@ -1,4 +1,4 @@
-import { Component, signal, WritableSignal } from "@angular/core";
+import { Component, inject, signal, WritableSignal } from "@angular/core";
 import { SignJWT } from "jose";
 import { ApiService } from "../api-service";
 import { FormsModule } from "@angular/forms";
@@ -16,6 +16,7 @@ import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { VerificationService } from "@services/verification.service";
 import { HolderKeyService } from "@services/holder-key.service";
 import { Router } from "@angular/router";
+import { RequestObject } from "src/generated/verifier";
 
 @Component({
   selector: "app-credential-verification-v1",
@@ -40,6 +41,12 @@ import { Router } from "@angular/router";
   standalone: true,
 })
 export class CredentialVerificationV1 {
+  private apiService = inject(ApiService);
+  private credentialService = inject(CredentialService);
+  private verificationService = inject(VerificationService);
+  private holderKeyService = inject(HolderKeyService);
+  private router = inject(Router);
+
   readonly panelOpenState = signal(false);
   public input =
     "swiyu-verify://?client_id=did%3Atdw%3AQmcsWxATnPMAcbjukjXAkVAUAKRSC71mjMWjod4NVWrZ9Y%3Amockserver%253A1080%3Aapi%3Av1%3Adid%3A64f74058-4fa3-4609-a7b4-dd6a8853bc32&request_uri=http%3A%2F%2Fdefault-verifier-url.admin.ch%2Foid4vp%2Fapi%2Frequest-object%2F9eafca2d-9bae-46a2-a81d-f3576809d2c0";
@@ -58,13 +65,7 @@ export class CredentialVerificationV1 {
   decodedPayload: WritableSignal<any> = signal(undefined);
   presentedClaims: WritableSignal<any> = signal(undefined);
 
-  constructor(
-    private apiService: ApiService,
-    private credentialService: CredentialService,
-    private verificationService: VerificationService,
-    private holderKeyService: HolderKeyService,
-    private router: Router
-  ) {
+  constructor() {
     const navigation = this.router.getCurrentNavigation();
     if (navigation?.extras?.state?.credential) {
       this.credentialInput.set(navigation.extras.state.credential);
@@ -79,7 +80,7 @@ export class CredentialVerificationV1 {
       return;
     }
 
-    let decodedDeeplink: any =
+    const decodedDeeplink: any =
       this.verificationService.decodeDeeplink(input);
     this.deeplink.set(decodedDeeplink);
 
@@ -92,7 +93,7 @@ export class CredentialVerificationV1 {
     this.apiService
       .resolveRequestObjectFromDeeplink(decodedDeeplink?.request_uri)
       .pipe(
-        switchMap((requestObject: any) => {
+        switchMap((requestObject: RequestObject) => {
           this.requestObject.set(requestObject);
           this.presentationDefinition.set(requestObject?.presentation_definition);
 
@@ -126,7 +127,7 @@ export class CredentialVerificationV1 {
         })
       )
       .subscribe({
-        next: (response) => {
+        next: () => {
           this.responseSubmitted.set(true);
         },
         error: (error) => {
@@ -399,9 +400,12 @@ export class CredentialVerificationV1 {
     const saltBytes = new Uint8Array(16);
     crypto.getRandomValues(saltBytes);
     let binary = '';
-    for (let i = 0; i < saltBytes.length; i++) {
-      binary += String.fromCharCode(saltBytes[i]);
-    }
+    // for (let i = 0; i < saltBytes.length; i++) {
+    //   binary += String.fromCharCode(saltBytes[i]);
+    // }
+    saltBytes.forEach(saltByte => {
+      binary += String.fromCharCode(saltByte);
+    });
     return btoa(binary)
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
@@ -411,9 +415,12 @@ export class CredentialVerificationV1 {
   private base64UrlEncode(input: string): string {
     const bytes = new TextEncoder().encode(input);
     let binary = '';
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
+    // for (let i = 0; i < bytes.length; i++) {
+    //   binary += String.fromCharCode(bytes[i]);
+    // }
+    bytes.forEach(byte => {
+      binary += String.fromCharCode(byte);
+    });
     return btoa(binary)
       .replace(/\+/g, '-')
       .replace(/\//g, '_')

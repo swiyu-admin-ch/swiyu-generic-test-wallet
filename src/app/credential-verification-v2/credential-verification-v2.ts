@@ -1,4 +1,4 @@
-import { Component, signal, WritableSignal } from "@angular/core";
+import { Component, inject, Inject, signal, WritableSignal } from "@angular/core";
 import { SignJWT } from "jose";
 import { ApiService } from "../api-service";
 import { FormsModule } from "@angular/forms";
@@ -10,12 +10,12 @@ import { MatAccordion } from "@angular/material/expansion";
 import { JsonPipe, SlicePipe, CommonModule } from "@angular/common";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
-import { CredentialService } from "@services/credential.service";
 import { DeeplinkInput } from "../deeplink-input/deeplink-input";
 import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { VerificationService } from "@services/verification.service";
 import { HolderKeyService } from "@services/holder-key.service";
 import { Router } from "@angular/router";
+import { DcqlQueryDto, RequestObject } from "src/generated/verifier";
 
 @Component({
   selector: "app-credential-verification-v2",
@@ -39,6 +39,11 @@ import { Router } from "@angular/router";
   standalone: true,
 })
 export class CredentialVerificationV2 {
+  private apiService = inject(ApiService);
+  private verificationService = inject(VerificationService);
+  private holderKeyService = inject(HolderKeyService);
+  private router = inject(Router);
+
   readonly panelOpenState = signal(false);
   public input =
     "swiyu-verify://?client_id=did%3Atdw%3AQmcsWxATnPMAcbjukjXAkVAUAKRSC71mjMWjod4NVWrZ9Y%3Amockserver%253A1080%3Aapi%3Av2%3Adid%3A64f74058-4fa3-4609-a7b4-dd6a8853bc32&request_uri=http%3A%2F%2Fdefault-verifier-url.admin.ch%2Foid4vp%2Fapi%2Frequest-object%2F9eafca2d-9bae-46a2-a81d-f3576809d2c0";
@@ -57,10 +62,6 @@ export class CredentialVerificationV2 {
   decodedPayload: WritableSignal<any> = signal(undefined);
 
   constructor(
-    private apiService: ApiService,
-    private verificationService: VerificationService,
-    private holderKeyService: HolderKeyService,
-    private router: Router
   ) {
     const navigation = this.router.getCurrentNavigation();
     if (navigation?.extras?.state?.credential) {
@@ -76,7 +77,7 @@ export class CredentialVerificationV2 {
       return;
     }
 
-    let decodedDeeplink: any =
+    const decodedDeeplink: any =
       this.verificationService.decodeDeeplink(input);
     this.deeplink.set(decodedDeeplink);
 
@@ -84,7 +85,7 @@ export class CredentialVerificationV2 {
     this.apiService
       .resolveRequestObjectFromDeeplink(decodedDeeplink?.request_uri)
       .pipe(
-        switchMap((requestObject: any) => {
+        switchMap((requestObject: RequestObject) => {
           this.requestObject.set(requestObject);
           this.dcqlQuery.set(requestObject?.dcql_query);
 
@@ -253,7 +254,7 @@ export class CredentialVerificationV2 {
     return vpToken;
   }
 
-  private extractFieldPathsFromDCQL(dcqlQuery: any): string[] {
+  private extractFieldPathsFromDCQL(dcqlQuery: DcqlQueryDto): string[] {
     const DISCLOSURE_EXCLUDED = new Set(['iss', 'nbf', 'exp', 'cnf', 'status']);
     const fieldPaths: string[] = [];
 

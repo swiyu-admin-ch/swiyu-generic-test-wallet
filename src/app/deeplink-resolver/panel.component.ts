@@ -11,7 +11,7 @@ import {MatIcon} from "@angular/material/icon";
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PanelComponent {
-    @Input() panelOpenState: any;
+    @Input() panelOpenState: boolean;
     @Input() panelTitle: string;
     @Input() data: any = undefined;
 }

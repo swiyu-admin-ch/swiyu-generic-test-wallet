@@ -6,9 +6,6 @@ import * as jose from "jose";
 })
 export class CredentialService {
 
-    constructor() {
-    }
-
     public decodeDeeplink(url: string): string {
         if (!url) {
             return 'No url provided';
@@ -18,7 +15,8 @@ export class CredentialService {
             const json = this.getCredentialOfferString(decodedUri);
             try {
                 return JSON.parse(json);
-            } catch (e) {
+            } catch (error) {
+                console.error(error);
                 return json;
             }
         }
@@ -47,14 +45,11 @@ export class CredentialService {
         return jwt;
     }
 
-    public async decodeResponse(jwt: string, registryEntry: any[], issuer: string): Promise<any> {
-
+    public async decodeResponse(jwt: string, registryEntry: any[]): Promise<{ payload: jose.JWTPayload; protectedHeader: jose.JWTHeaderParameters; }> {
         const kid = jose.decodeProtectedHeader(jwt).kid;
         const verificationMethod = registryEntry[3]?.value?.verificationMethod.map(meth => meth.id === kid ? meth : null).filter(meth => meth != null)[0];
         const jwk = verificationMethod?.publicKeyJwk;
-        const {payload, protectedHeader} = await jose.jwtVerify(jwt, jwk, {
-            // issuer: issuer
-        })
+        const {payload, protectedHeader} = await jose.jwtVerify(jwt, jwk, {})
 
         return {payload, protectedHeader};
     }

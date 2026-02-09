@@ -1,5 +1,6 @@
 import {
   Component,
+  inject,
   Input,
   OnChanges,
   signal,
@@ -9,7 +10,6 @@ import {
 import { MatFormField } from "@angular/material/form-field";
 import { MatInput } from "@angular/material/input";
 import { FormsModule } from "@angular/forms";
-import { ApiService } from "../api-service";
 import { CommonModule } from "@angular/common";
 import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import * as jose from "jose";
@@ -56,11 +56,11 @@ export class Credential implements OnChanges {
   @Input({ required: true }) encodedCredential: string;
   @Input({ required: true }) registryEntry: any[];
 
+  private router = inject(Router);
+
   decodedHeader: WritableSignal<any> = signal(undefined);
   decodedPayload: WritableSignal<any> = signal(undefined);
   disclosures = signal([]);
-
-  constructor(private apiService: ApiService, private router: Router) {}
 
   async getCredentialDetails(): Promise<void> {
     const token = this.encodedCredential.split("~");
@@ -84,7 +84,7 @@ export class Credential implements OnChanges {
       this.decodedHeader.set(protectedHeader);
       this.decodedPayload.set(payload);
 
-      let disclosures: any[] = [];
+      const disclosures: any[] = [];
 
       for (let i = 1; i < token.length - 1; i++) {
         disclosures.push(JSON.parse(this.base64UrlDecode(token[i])));

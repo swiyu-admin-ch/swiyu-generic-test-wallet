@@ -1,4 +1,4 @@
-import { Injectable } from "@angular/core";
+import { inject, Injectable } from "@angular/core";
 import {
   HttpClient,
   HttpErrorResponse,
@@ -11,7 +11,7 @@ import { catchError, Observable, throwError, map } from "rxjs";
   providedIn: "root",
 })
 export class ApiService {
-  constructor(private http: HttpClient) {}
+  private http = inject(HttpClient)
 
   public resolveOpenIdMetadataFromDeeplink(
     issuerCredentialUrl: string
@@ -52,7 +52,8 @@ export class ApiService {
         map((response: string) => {
           try {
             return JSON.parse(response);
-          } catch (e) {
+          } catch (error) {
+            console.error(error);
             return this.decodeJwtPayload(response);
           }
         }),
@@ -203,13 +204,14 @@ export class ApiService {
   public submitVerificationResponseDcql(
     responseDataUri: string,
     vpToken: string,
-    credentialId: string = "credential_1"
+    credentialId = "credential_1"
   ): Observable<any> {
     if (!responseDataUri) {
       return throwError(() => new Error("No response_uri provided"));
     }
 
-    const vpTokenMap: { [key: string]: string[] } = {};
+    // const vpTokenMap: { [key: string]: string[] } = {};
+    const vpTokenMap: Record<string, string[]> = {};
     vpTokenMap[credentialId] = [vpToken];
     const vpTokenJson = JSON.stringify(vpTokenMap);
 

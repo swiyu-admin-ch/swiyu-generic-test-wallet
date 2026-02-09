@@ -1,6 +1,5 @@
-import { Component, OnInit, signal, WritableSignal } from "@angular/core";
+import { Component, inject, signal, WritableSignal } from "@angular/core";
 import * as jose from "jose";
-import { JWK } from "jose";
 import { Credential } from "../credential/credential";
 import { ApiService } from "../api-service";
 import { FormsModule } from "@angular/forms";
@@ -41,6 +40,9 @@ import { HolderKeyService } from "@services/holder-key.service";
   standalone: true,
 })
 export class CredentialIssuanceV2 {
+  private apiService = inject(ApiService);
+  private credentialService = inject(CredentialService);
+  private holderKeyService = inject(HolderKeyService);
   readonly panelOpenState = signal(false);
   public input =
     "swiyu://?credential_offer=%7B%22grants%22%3A%7B%22urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Apre-authorized_code%22%3A%7B%22pre-authorized_code%22%3A%225c2ce09c-44ac-45a1-9d25-d066dd8ad277%22%7D%7D%2C%22version%22%3A%221.0%22%2C%22credential_issuer%22%3A%22https%3A%2F%2Fbcs.admin.ch%2Fbcs-web%2Fissuer-agent%2Foid4vci%22%2C%22credential_configuration_ids%22%3A%5B%22betaid-sdjwt%22%5D%7D";
@@ -55,12 +57,6 @@ export class CredentialIssuanceV2 {
   decodedHeader: WritableSignal<undefined | any> = signal(undefined);
   registryEntry: WritableSignal<undefined | any[]> = signal(undefined);
 
-  constructor(
-    private apiService: ApiService,
-    private credentialService: CredentialService,
-    private holderKeyService: HolderKeyService
-  ) {}
-
   public onResolve(input: string): void {
     this.reset();
 
@@ -71,7 +67,7 @@ export class CredentialIssuanceV2 {
       .resolveOpenIdMetadataFromDeeplink(decodedDeeplink?.credential_issuer)
       .pipe(
         switchMap((metadata) => {
-          if (!!metadata) {
+          if (!metadata) {
             this.metadata.set(metadata);
             this.extractCredentialConfigurationsSupported(
               decodedDeeplink,
@@ -127,8 +123,7 @@ export class CredentialIssuanceV2 {
           return of(
             this.credentialService.decodeResponse(
               jwt,
-              this.registryEntry(),
-              this.metadata()?.credential_issuer
+              this.registryEntry()
             )
           );
         }),
@@ -143,17 +138,6 @@ export class CredentialIssuanceV2 {
       .subscribe((credential) => {
         console.log("credential", credential);
       });
-  }
-
-  async ngOnInit(): Promise<void> {
-    const { publicKey, privateKey } = await crypto.subtle.generateKey(
-      {
-        name: "ECDSA",
-        namedCurve: "P-256",
-      },
-      true,
-      ["sign", "verify"]
-    );
   }
 
   public reset(): void {

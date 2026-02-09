@@ -1,24 +1,23 @@
-import {Injectable} from '@angular/core';
+import { Injectable } from '@angular/core';
 import * as jose from "jose";
+import { DcqlCredentialDto, DcqlQueryDto, Field, InputDescriptor, PresentationDefinition } from 'src/generated/verifier';
 
 @Injectable({
     providedIn: 'root'
 })
 export class VerificationService {
 
-    constructor() {
-    }
-
-    public decodeDeeplink(url: string): any {
+    public decodeDeeplink(url: string): Record<string, string> | null {
         if (!url) {
-            return 'No url provided';
+            return null;
         }
+
         if (url.startsWith('swiyu-verify://')) {
             const withoutProtocol = url.replace('swiyu-verify://?', '');
             const decodedUri = decodeURIComponent(withoutProtocol);
 
             const params = new URLSearchParams(decodedUri);
-            const result: any = {};
+            const result: Record<string, string> = {};
 
             params.forEach((value, key) => {
                 result[key] = value;
@@ -26,8 +25,10 @@ export class VerificationService {
 
             return result;
         }
+
         return null;
     }
+
 
     public async createHolderBinding(
         credentialIssuer: string,
@@ -43,7 +44,7 @@ export class VerificationService {
         }
 
         const jwt = await new jose.SignJWT(claims)
-            .setProtectedHeader({alg: proofSigningAlgValuesSupported, typ: 'openid4vci-proof+jwt', jwk: jwk})
+            .setProtectedHeader({ alg: proofSigningAlgValuesSupported, typ: 'openid4vci-proof+jwt', jwk: jwk })
             .setIssuedAt(Math.floor(Date.now() / 1000))
             .setAudience(credentialIssuer)
             .setExpirationTime('2h')
@@ -52,19 +53,19 @@ export class VerificationService {
         return jwt;
     }
 
-    public async decodeResponse(jwt: string, registryEntry: any[], issuer: string): Promise<any> {
+    public async decodeResponse(jwt: string, registryEntry: any[]): Promise<any> {
 
         const kid = jose.decodeProtectedHeader(jwt).kid;
         const verificationMethod = registryEntry[3]?.value?.verificationMethod.map(meth => meth.id === kid ? meth : null).filter(meth => meth != null)[0];
         const jwk = verificationMethod?.publicKeyJwk;
-        const {payload, protectedHeader} = await jose.jwtVerify(jwt, jwk, {
+        const { payload, protectedHeader } = await jose.jwtVerify(jwt, jwk, {
         })
 
-        return {payload, protectedHeader};
+        return { payload, protectedHeader };
     }
 
     public async createKeySet(): Promise<{ publicKey: CryptoKey, privateKey: CryptoKey, jwk: jose.JWK }> {
-        const {publicKey, privateKey} = await crypto.subtle.generateKey(
+        const { publicKey, privateKey } = await crypto.subtle.generateKey(
             {
                 name: "ECDSA",
                 namedCurve: "P-256",
@@ -74,24 +75,25 @@ export class VerificationService {
 
         const jwk = await jose.exportJWK(publicKey);
 
-        return {publicKey: publicKey, privateKey: privateKey, jwk: jwk}
+        return { publicKey: publicKey, privateKey: privateKey, jwk: jwk }
     }
 
 
-    public extractRequiredClaimsFromPresentationDefinition(presentationDefinition: any): any[] {
+    public extractRequiredClaimsFromPresentationDefinition(presentationDefinition: PresentationDefinition): any[] {
         if (!presentationDefinition?.input_descriptors) {
             return [];
         }
 
         const requiredClaims: any[] = [];
 
-        presentationDefinition.input_descriptors.forEach((descriptor: any) => {
+        presentationDefinition.input_descriptors.forEach((descriptor: InputDescriptor) => {
             if (descriptor.constraints?.fields) {
-                descriptor.constraints.fields.forEach((field: any) => {
+                descriptor.constraints.fields.forEach((field: Field) => {
                     requiredClaims.push({
                         path: field.path,
                         filter: field.filter,
-                        required: field.optional !== true
+                        required: false,
+                        //required: field.optional !== true @TODO
                     });
                 });
             }
@@ -100,14 +102,14 @@ export class VerificationService {
         return requiredClaims;
     }
 
-    public extractCredentialsFromDCQL(dcqlQuery: any): any[] {
+    public extractCredentialsFromDCQL(dcqlQuery: DcqlQueryDto): DcqlCredentialDto[] {
         if (!dcqlQuery?.credentials) {
             return [];
         }
 
-        const credentials: any[] = [];
+        const credentials: DcqlCredentialDto[] = [];
 
-        dcqlQuery.credentials.forEach((credential: any) => {
+        dcqlQuery.credentials.forEach((credential: DcqlCredentialDto) => {
             credentials.push({
                 id: credential.id,
                 format: credential.format,
@@ -126,7 +128,7 @@ export class VerificationService {
         jwk: jose.JWK
     ): Promise<string> {
         const claims = {
-            "iss": "did:example:holder", 
+            "iss": "did:example:holder",
             "aud": verifierId,
             "nonce": nonce,
             "iat": Math.floor(Date.now() / 1000),
