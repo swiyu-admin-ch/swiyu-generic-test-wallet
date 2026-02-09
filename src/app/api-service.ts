@@ -6,6 +6,7 @@ import {
   HttpParams,
 } from "@angular/common/http";
 import { catchError, Observable, throwError, map } from "rxjs";
+import { NonceResponse, OAuthToken } from "src/generated/issuer";
 
 @Injectable({
   providedIn: "root",
@@ -53,7 +54,7 @@ export class ApiService {
           try {
             return JSON.parse(response);
           } catch (error) {
-            console.error(error);
+            console.log(error);
             return this.decodeJwtPayload(response);
           }
         }),
@@ -76,9 +77,9 @@ export class ApiService {
     }
   }
 
-  public getAccessToken(preAuthCode: string, tokenEndpointUrl: string): any {
+  public getAccessToken(preAuthCode: string, tokenEndpointUrl: string): Observable<OAuthToken> {
     if (!preAuthCode || !tokenEndpointUrl) {
-      return throwError(() => new Error("No pre-authorized code provided"));
+      throwError(() => new Error("No pre-authorized code provided"));
     }
 
     const body = new HttpParams()
@@ -86,21 +87,21 @@ export class ApiService {
       .set("pre-authorized_code", preAuthCode);
 
     return this.http
-      .post<any>(tokenEndpointUrl, body.toString(), {
+      .post<OAuthToken>(tokenEndpointUrl, body.toString(), {
         responseType: "json",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       })
       .pipe(catchError((err) => this.handleError(err)));
   }
 
-  public getNonce(nonceEndpoint: string): any {
+  public getNonce(nonceEndpoint: string): Observable<NonceResponse> {
     if (!nonceEndpoint) {
       throwError(() => new Error("No nonce_endpoint provided"));
     }
 
     // ${nonceEndpoint}/oid4vci/api/nonce
     return this.http
-      .post<any>(`${nonceEndpoint}`, {
+      .post<NonceResponse>(`${nonceEndpoint}`, {
         responseType: "json",
       })
       .pipe(catchError(this.handleError));

@@ -45,7 +45,7 @@ export class CredentialService {
         return jwt;
     }
 
-    public async decodeResponse(jwt: string, registryEntry: any[]): Promise<{ payload: jose.JWTPayload; protectedHeader: jose.JWTHeaderParameters; }> {
+    public async decodeResponse(jwt: string, registryEntry: any[]): Promise<{ payload: jose.JWTPayload, protectedHeader: jose.JWTHeaderParameters, }> {
         const kid = jose.decodeProtectedHeader(jwt).kid;
         const verificationMethod = registryEntry[3]?.value?.verificationMethod.map(meth => meth.id === kid ? meth : null).filter(meth => meth != null)[0];
         const jwk = verificationMethod?.publicKeyJwk;

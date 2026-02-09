@@ -17,6 +17,7 @@ import { MatButton } from "@angular/material/button";
 import { DeeplinkInput } from "../deeplink-input/deeplink-input";
 import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { HolderKeyService } from "@services/holder-key.service";
+import { OAuthToken } from "src/generated/issuer";
 
 @Component({
   selector: "app-credential-issuance-v1",
@@ -72,6 +73,7 @@ export class CredentialIssuanceV1 {
       .resolveOpenIdMetadataFromDeeplink(decodedDeeplink?.credential_issuer)
       .pipe(
         switchMap((metadata) => {
+          console.log("ICI 3 : ", typeof(metadata), metadata)
           if (metadata) {
             this.metadata.set(metadata);
             this.extractCredentialConfigurationsSupported(
@@ -94,7 +96,7 @@ export class CredentialIssuanceV1 {
             openIdConfig?.token_endpoint
           );
         }),
-        switchMap((accessToken: any) => {
+        switchMap((accessToken: OAuthToken) => {
           console.log("accessToken", accessToken);
           this.tokenResponse.set(accessToken);
           this.nonceResponse.set(accessToken?.c_nonce);
@@ -116,6 +118,7 @@ export class CredentialIssuanceV1 {
           return this.apiService.getRegistryEntry(decoded.iss);
         }),
         switchMap((registryEntry: any) => {
+          console.log("ICI : ", registryEntry);
           this.registryEntry.set(registryEntry);
           return of(registryEntry);
         }),

@@ -1,5 +1,5 @@
 import { Component, inject, signal, WritableSignal } from "@angular/core";
-import { SignJWT } from "jose";
+import { ProtectedHeaderParameters, SignJWT } from "jose";
 import { ApiService } from "../api-service";
 import { FormsModule } from "@angular/forms";
 import { from, of, switchMap } from "rxjs";
@@ -16,7 +16,7 @@ import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { VerificationService } from "@services/verification.service";
 import { HolderKeyService } from "@services/holder-key.service";
 import { Router } from "@angular/router";
-import { RequestObject } from "src/generated/verifier";
+import { PresentationDefinition, RequestObject } from "src/generated/verifier";
 
 @Component({
   selector: "app-credential-verification-v1",
@@ -52,18 +52,17 @@ export class CredentialVerificationV1 {
     "swiyu-verify://?client_id=did%3Atdw%3AQmcsWxATnPMAcbjukjXAkVAUAKRSC71mjMWjod4NVWrZ9Y%3Amockserver%253A1080%3Aapi%3Av1%3Adid%3A64f74058-4fa3-4609-a7b4-dd6a8853bc32&request_uri=http%3A%2F%2Fdefault-verifier-url.admin.ch%2Foid4vp%2Fapi%2Frequest-object%2F9eafca2d-9bae-46a2-a81d-f3576809d2c0";
 
   deeplink: WritableSignal<undefined | any> = signal(undefined);
-  requestObject: WritableSignal<undefined | any> = signal(undefined);
-  presentationDefinition: WritableSignal<undefined | any> = signal(undefined);
-  requiredClaims: WritableSignal<undefined | any[]> = signal(undefined);
-  credentialInput: WritableSignal<string> = signal("");
-  vpToken: WritableSignal<undefined | string> = signal(undefined);
+  requestObject: WritableSignal<RequestObject | undefined> = signal(undefined);
+  presentationDefinition: WritableSignal<PresentationDefinition | undefined> = signal(undefined);
+  requiredClaims: WritableSignal<any[] | undefined> = signal(undefined);
+  credentialInput: WritableSignal<string | undefined> = signal("");
+  vpToken: WritableSignal<string | undefined> = signal(undefined);
   responseSubmitted: WritableSignal<boolean> = signal(false);
 
   credentialValid: WritableSignal<boolean> = signal(false);
   credentialValidationError: WritableSignal<string | undefined> = signal(undefined);
-  decodedHeader: WritableSignal<any> = signal(undefined);
-  decodedPayload: WritableSignal<any> = signal(undefined);
-  presentedClaims: WritableSignal<any> = signal(undefined);
+  decodedHeader: WritableSignal<ProtectedHeaderParameters | undefined> = signal(undefined);
+  decodedPayload: WritableSignal<any | undefined> = signal(undefined);
 
   constructor() {
     const navigation = this.router.getCurrentNavigation();
@@ -147,7 +146,6 @@ export class CredentialVerificationV1 {
     this.credentialValidationError.set(undefined);
     this.decodedHeader.set(undefined);
     this.decodedPayload.set(undefined);
-    this.presentedClaims.set(undefined);
   }
 
   private validateCredential(): boolean {
@@ -184,7 +182,9 @@ export class CredentialVerificationV1 {
         );
 
         this.decodedHeader.set(headerJson);
+
         this.decodedPayload.set(payloadJson);
+        console.log("ICI ", payloadJson, typeof(payloadJson))
         this.credentialValid.set(true);
         this.credentialValidationError.set(undefined);
         return true;
@@ -259,7 +259,7 @@ export class CredentialVerificationV1 {
     return hashBase64Url;
   }
 
-  private createPresentationSubmission(presentationDefinition: any): any {
+  private createPresentationSubmission(presentationDefinition: PresentationDefinition): { id: string, definition_id: string, descriptor_map: any[]} {
     if (!presentationDefinition?.input_descriptors) {
       return {
         id: "presentation_submission",
@@ -323,6 +323,7 @@ export class CredentialVerificationV1 {
             this.base64UrlDecode(payloadB64)
           )
         );
+        console.log("ANY B " + typeof(payloadJson))
         return await this.createSdJwtWithDisclosures(jwtPart, payloadJson, requiredFields);
       }
 

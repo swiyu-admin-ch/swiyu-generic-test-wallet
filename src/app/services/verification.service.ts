@@ -53,7 +53,7 @@ export class VerificationService {
         return jwt;
     }
 
-    public async decodeResponse(jwt: string, registryEntry: any[]): Promise<any> {
+    public async decodeResponse(jwt: string, registryEntry: any[]): Promise<{ payload: jose.JWTPayload, protectedHeader: jose.JWTHeaderParameters, }> {
 
         const kid = jose.decodeProtectedHeader(jwt).kid;
         const verificationMethod = registryEntry[3]?.value?.verificationMethod.map(meth => meth.id === kid ? meth : null).filter(meth => meth != null)[0];
@@ -79,22 +79,24 @@ export class VerificationService {
     }
 
 
-    public extractRequiredClaimsFromPresentationDefinition(presentationDefinition: PresentationDefinition): any[] {
+    public extractRequiredClaimsFromPresentationDefinition(presentationDefinition: PresentationDefinition): Field[] {
         if (!presentationDefinition?.input_descriptors) {
             return [];
         }
 
-        const requiredClaims: any[] = [];
+        const requiredClaims: Field[] = [];
 
         presentationDefinition.input_descriptors.forEach((descriptor: InputDescriptor) => {
             if (descriptor.constraints?.fields) {
                 descriptor.constraints.fields.forEach((field: Field) => {
-                    requiredClaims.push({
-                        path: field.path,
-                        filter: field.filter,
-                        required: false,
-                        //required: field.optional !== true @TODO
-                    });
+                    //@TODO
+                    requiredClaims.push(field);
+                    // requiredClaims.push({
+                    //     path: field.path,
+                    //     filter: field.filter,
+                    //     required: false,
+                    //     //required: field.optional !== true @TODO
+                    // });
                 });
             }
         });

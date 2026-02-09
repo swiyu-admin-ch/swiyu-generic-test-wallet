@@ -16,6 +16,7 @@ import { MatButton } from "@angular/material/button";
 import { DeeplinkInput } from "../deeplink-input/deeplink-input";
 import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { HolderKeyService } from "@services/holder-key.service";
+import { NonceResponse, OAuthToken } from "src/generated/issuer";
 
 @Component({
   selector: "app-credential-issuance-v2",
@@ -50,8 +51,8 @@ export class CredentialIssuanceV2 {
   metadata: WritableSignal<undefined | any> = signal(undefined);
   credentialConfig: WritableSignal<undefined | any> = signal(undefined);
   openIdConfig: WritableSignal<undefined | any> = signal(undefined);
-  tokenResponse: WritableSignal<undefined | any> = signal(undefined);
-  nonceResponse: WritableSignal<undefined | any> = signal(undefined);
+  tokenResponse: WritableSignal<OAuthToken | undefined> = signal(undefined);
+  nonceResponse: WritableSignal<NonceResponse | undefined> = signal(undefined);
   encodedCredential: WritableSignal<undefined | any> = signal(undefined);
   decodedPayload: WritableSignal<undefined | any> = signal(undefined);
   decodedHeader: WritableSignal<undefined | any> = signal(undefined);
@@ -67,7 +68,9 @@ export class CredentialIssuanceV2 {
       .resolveOpenIdMetadataFromDeeplink(decodedDeeplink?.credential_issuer)
       .pipe(
         switchMap((metadata) => {
-          if (!metadata) {
+
+          console.log("Any C : ", typeof(metadata));
+          if (metadata) {
             this.metadata.set(metadata);
             this.extractCredentialConfigurationsSupported(
               decodedDeeplink,
@@ -89,14 +92,14 @@ export class CredentialIssuanceV2 {
             openIdConfig?.token_endpoint
           );
         }),
-        switchMap((accessToken: any) => {
+        switchMap((accessToken: OAuthToken) => {
           this.tokenResponse.set(accessToken);
 
           return from(
             this.apiService.getNonce(this.metadata()?.["nonce_endpoint"])
           );
         }),
-        switchMap((nonce: any) => {
+        switchMap((nonce: NonceResponse) => {
           this.nonceResponse.set(nonce);
 
           return from(this.getCredentialRequestV2(nonce?.c_nonce));

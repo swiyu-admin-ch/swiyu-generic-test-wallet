@@ -1,4 +1,4 @@
-import { Component, inject, Inject, signal, WritableSignal } from "@angular/core";
+import { Component, inject, signal, WritableSignal } from "@angular/core";
 import { SignJWT } from "jose";
 import { ApiService } from "../api-service";
 import { FormsModule } from "@angular/forms";
@@ -15,7 +15,7 @@ import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { VerificationService } from "@services/verification.service";
 import { HolderKeyService } from "@services/holder-key.service";
 import { Router } from "@angular/router";
-import { DcqlQueryDto, RequestObject } from "src/generated/verifier";
+import { DcqlClaimDto, DcqlCredentialDto, DcqlQueryDto, RequestObject } from "src/generated/verifier";
 
 @Component({
   selector: "app-credential-verification-v2",
@@ -48,12 +48,12 @@ export class CredentialVerificationV2 {
   public input =
     "swiyu-verify://?client_id=did%3Atdw%3AQmcsWxATnPMAcbjukjXAkVAUAKRSC71mjMWjod4NVWrZ9Y%3Amockserver%253A1080%3Aapi%3Av2%3Adid%3A64f74058-4fa3-4609-a7b4-dd6a8853bc32&request_uri=http%3A%2F%2Fdefault-verifier-url.admin.ch%2Foid4vp%2Fapi%2Frequest-object%2F9eafca2d-9bae-46a2-a81d-f3576809d2c0";
 
-  deeplink: WritableSignal<undefined | any> = signal(undefined);
-  requestObject: WritableSignal<undefined | any> = signal(undefined);
-  dcqlQuery: WritableSignal<undefined | any> = signal(undefined);
-  requiredCredentials: WritableSignal<undefined | any[]> = signal(undefined);
+  deeplink: WritableSignal<Record<string, string> | undefined> = signal(undefined);
+  requestObject: WritableSignal<RequestObject | undefined> = signal(undefined);
+  dcqlQuery: WritableSignal<DcqlQueryDto | undefined> = signal(undefined);
+  requiredCredentials: WritableSignal<DcqlCredentialDto[] | undefined> = signal(undefined);
   credentialInput: WritableSignal<string> = signal("");
-  vpToken: WritableSignal<undefined | string> = signal(undefined);
+  vpToken: WritableSignal<string | undefined> = signal(undefined);
   responseSubmitted: WritableSignal<boolean> = signal(false);
 
   credentialValid: WritableSignal<boolean> = signal(false);
@@ -262,10 +262,10 @@ export class CredentialVerificationV2 {
       return fieldPaths;
     }
 
-    dcqlQuery.credentials.forEach((credential: any) => {
-      credential.claims?.forEach((claim: any) => {
+    dcqlQuery.credentials.forEach((credential: DcqlCredentialDto) => {
+      credential.claims?.forEach((claim: DcqlClaimDto) => {
         if (claim.path && Array.isArray(claim.path)) {
-          claim.path.forEach((pathElement: any) => {
+          claim.path.forEach((pathElement: string | number | string[]) => {
             if (typeof pathElement === 'string') {
               const claimName = pathElement.replace(/^\$\./, '');
               if (!DISCLOSURE_EXCLUDED.has(claimName)) {
@@ -376,6 +376,7 @@ export class CredentialVerificationV2 {
   }
 
   private validateRequiredFields(requiredFields: string[], payloadJson: any): string[] {
+    console.log("A", typeof(payloadJson));
     const RESERVED_CLAIMS = new Set(['iss', 'nbf', 'exp', 'cnf', 'vct', 'status']);
     const missingFields: string[] = [];
 
