@@ -1,14 +1,17 @@
-import {Injectable} from '@angular/core';
+import {Injectable, inject} from '@angular/core';
 import * as jose from "jose";
 import { RegistryEntry, JwtPayload } from "@app/models/api-response";
+import { ToastService } from "./toast.service";
 
 @Injectable({
     providedIn: 'root'
 })
 export class CredentialService {
+    private toastService = inject(ToastService);
 
     public decodeDeeplink(url: string): Record<string, unknown> {
         if (!url) {
+            this.toastService.showError('The deeplink is missing');
             throw new Error('No url provided');
         }
         if (url.startsWith('swiyu://')) {
@@ -18,9 +21,11 @@ export class CredentialService {
                 return JSON.parse(json) as Record<string, unknown>;
             } catch (error) {
                 console.error(error);
+                this.toastService.showError(`Failed to parse credential offer: ${error}`);
                 throw new Error(`Failed to parse credential offer: ${error}`);
             }
         }
+        this.toastService.showError('Invalid deeplink format');
         throw new Error('Invalid deeplink format');
     }
 

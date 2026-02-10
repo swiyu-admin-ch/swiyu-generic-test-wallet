@@ -4,7 +4,6 @@ import {
   Input,
   OnChanges,
   signal,
-  SimpleChanges,
   WritableSignal,
 } from "@angular/core";
 import { MatFormField } from "@angular/material/form-field";
@@ -27,6 +26,7 @@ import { MatButton } from "@angular/material/button";
 import { MatIcon } from "@angular/material/icon";
 import { Router } from "@angular/router";
 import { JwtPayload, RegistryEntry } from "@app/models/api-response";
+import { ToastService } from "@app/services/toast.service";
 
 @Component({
   selector: "app-credential",
@@ -58,6 +58,7 @@ export class Credential implements OnChanges {
   @Input({ required: true }) registryEntry: RegistryEntry[];
 
   private router = inject(Router);
+  private toastService = inject(ToastService);
 
   decodedHeader: WritableSignal<JwtPayload | undefined> = signal(undefined);
   decodedPayload: WritableSignal<JwtPayload | undefined> = signal(undefined);
@@ -66,7 +67,6 @@ export class Credential implements OnChanges {
   async getCredentialDetails(): Promise<void> {
     const token = this.encodedCredential.split("~");
 
-    const decodedPayload = (await jose.decodeJwt(token[0])) as JwtPayload;
     const decodedHeader = (await jose.decodeProtectedHeader(token[0])) as JwtPayload;
 
     if (this.registryEntry) {
@@ -96,8 +96,7 @@ export class Credential implements OnChanges {
     }
   }
 
-  public ngOnChanges(changes: SimpleChanges): void {
-    // changes.prop contains the old and the new value...
+  public ngOnChanges(): void {
     if (this.encodedCredential != null) {
       this.getCredentialDetails();
     }
@@ -126,10 +125,10 @@ export class Credential implements OnChanges {
     if (this.encodedCredential) {
       void navigator.clipboard.writeText(this.encodedCredential).then(
         () => {
-          console.log("Credential copied to clipboard");
+          this.toastService.showSuccess("SD-JWT VCI copied to the clipboard");
         },
         () => {
-          console.error("Failed to copy credential to clipboard");
+          this.toastService.showError("Failed to copy the SD-JWT VCI to the clipboard");
         }
       );
     }
