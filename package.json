@@ -8,8 +8,10 @@
     "build": "ng build --configuration production",
     "test": "ng test --watch=false",
     "lint": "ng lint",
-    "generate:issuer-api": "openapi-generator-cli generate -i openapi-spec/issuer-api.yaml -g typescript-angular -o src/generated/issuer --additional-properties=providedInRoot=true",
-    "generate:verifier-api": "openapi-generator-cli generate -i openapi-spec/verifier-api.yaml -g typescript-angular -o src/generated/verifier --additional-properties=providedInRoot=true"
+    "generate:apis": "npm run generate:issuer-api && npm run generate:verifier-api",
+    "generate:issuer-api": "openapi-generator-cli generate -i openapi-spec/issuer-api.yaml -g typescript-angular -o src/generated/issuer --additional-properties=providedInRoot=true --skip-validate-spec",
+    "generate:verifier-api": "openapi-generator-cli generate -i openapi-spec/verifier-api.yaml -g typescript-angular -o src/generated/verifier --additional-properties=providedInRoot=true --skip-validate-spec",
+    "clean:generated": "rm -rf src/generated"
   },
   "dependencies": {
     "@angular-devkit/build-angular": "^20.3.6",

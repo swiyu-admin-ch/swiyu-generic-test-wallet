@@ -37,6 +37,9 @@ jobs:
           languages: javascript-typescript
           config-file: ./.github/codeql/codeql-config.yml
 
+      - name: Generate issuer and verifier APIs
+        run: npm run generate:apis
+
       - name: Run Angular build
         run: npm run build
 
