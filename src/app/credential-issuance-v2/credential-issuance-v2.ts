@@ -59,6 +59,10 @@ export class CredentialIssuanceV2 {
   decodedHeader: WritableSignal<JwtPayload | undefined> = signal(undefined);
   registryEntry: WritableSignal<RegistryEntry[] | undefined> = signal(undefined);
 
+  public onClear(): void {
+    this.reset();
+  }
+
   public onResolve(input: string): void {
     this.reset();
 

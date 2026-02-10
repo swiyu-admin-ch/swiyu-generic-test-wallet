@@ -22,14 +22,14 @@ import {MatInput, MatInputModule} from "@angular/material/input";
 export class DeeplinkInput {
     @Input() input: string;
     @Input() label: string;
-    @Output() inputChangeEvent = new EventEmitter<string>();
+    @Output() submitEvent = new EventEmitter<string>();
+    @Output() resetEvent = new EventEmitter();
 
     public onSubmit(): void {
-        this.inputChangeEvent.emit(this.input);
+        this.submitEvent.emit(this.input);
     }
 
     public reset(): void {
-        this.input = '';
-        this.inputChangeEvent.emit(this.input);
+        this.resetEvent.emit();
     }
 }

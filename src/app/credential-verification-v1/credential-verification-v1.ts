@@ -58,7 +58,7 @@ export class CredentialVerificationV1 {
   requiredClaims: WritableSignal<Field[] | undefined> = signal(undefined);
   credentialInput: WritableSignal<string | undefined> = signal("");
   vpToken: WritableSignal<string | undefined> = signal(undefined);
-  responseSubmitted: WritableSignal<boolean> = signal(false);
+  responseSubmitted: WritableSignal<boolean | undefined> = signal(undefined);
 
   credentialValid: WritableSignal<boolean> = signal(false);
   credentialValidationError: WritableSignal<string | undefined> = signal(undefined);
@@ -70,6 +70,10 @@ export class CredentialVerificationV1 {
     if (navigation?.extras?.state?.credential) {
       this.credentialInput.set(navigation.extras.state.credential);
     }
+  }
+
+  public onClear(): void {
+    this.reset();
   }
 
   public onResolve(input: string): void {
@@ -143,7 +147,7 @@ export class CredentialVerificationV1 {
     this.presentationDefinition.set(undefined);
     this.requiredClaims.set(undefined);
     this.vpToken.set(undefined);
-    this.responseSubmitted.set(false);
+    this.responseSubmitted.set(undefined);
     this.credentialValid.set(false);
     this.credentialValidationError.set(undefined);
     this.decodedHeader.set(undefined);

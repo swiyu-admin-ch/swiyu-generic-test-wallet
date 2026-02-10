@@ -55,7 +55,7 @@ export class CredentialVerificationV2 {
   requiredCredentials: WritableSignal<DcqlCredentialDto[] | undefined> = signal(undefined);
   credentialInput: WritableSignal<string> = signal("");
   vpToken: WritableSignal<string | undefined> = signal(undefined);
-  responseSubmitted: WritableSignal<boolean> = signal(false);
+  responseSubmitted: WritableSignal<boolean | undefined> = signal(undefined);
 
   credentialValid: WritableSignal<boolean> = signal(false);
   credentialValidationError: WritableSignal<string | undefined> = signal(undefined);
@@ -68,6 +68,10 @@ export class CredentialVerificationV2 {
     if (navigation?.extras?.state?.credential) {
       this.credentialInput.set(navigation.extras.state.credential);
     }
+  }
+
+  public onClear(): void {
+    this.reset();
   }
 
   public onResolve(input: string): void {
@@ -102,7 +106,7 @@ export class CredentialVerificationV2 {
             return of(null);
           }
 
-          const requiredFields = this.extractFieldPathsFromDCQL(reqObj?.dcql_query);
+          const requiredFields = this.extractClaimsFromDcqlQuery(reqObj?.dcql_query);
           const payloadJson = this.extractPayloadFromSdJwt(credentialString);
           const validationErrors = this.validateRequiredFields(requiredFields, payloadJson);
 
@@ -151,7 +155,7 @@ export class CredentialVerificationV2 {
     this.dcqlQuery.set(undefined);
     this.requiredCredentials.set(undefined);
     this.vpToken.set(undefined);
-    this.responseSubmitted.set(false);
+    this.responseSubmitted.set(undefined);
     this.credentialValid.set(false);
     this.credentialValidationError.set(undefined);
     this.decodedHeader.set(undefined);
@@ -225,7 +229,7 @@ export class CredentialVerificationV2 {
   ): Promise<string> {
     const originalSdJwt = credentialString;
 
-    const requiredFields = this.extractFieldPathsFromDCQL(this.dcqlQuery());
+    const requiredFields = this.extractClaimsFromDcqlQuery(this.dcqlQuery());
 
     const selectiveDisclosureSdJwt = await this.createSelectiveDisclosureSdJwt(
       originalSdJwt,
@@ -255,36 +259,36 @@ export class CredentialVerificationV2 {
     return vpToken;
   }
 
-  private extractFieldPathsFromDCQL(dcqlQuery: DcqlQueryDto): string[] {
-    const DISCLOSURE_EXCLUDED = new Set(['iss', 'nbf', 'exp', 'cnf', 'status']);
-    const fieldPaths: string[] = [];
+  public extractClaimsFromDcqlQuery(
+    dcqlQuery: DcqlQueryDto | undefined
+  ): DcqlClaimDto[] {
 
     if (!dcqlQuery?.credentials) {
-      return fieldPaths;
+      return [];
     }
 
+    const extractedClaims: DcqlClaimDto[] = [];
+    const seenPaths = new Set<string>();
+
     dcqlQuery.credentials.forEach((credential: DcqlCredentialDto) => {
-      credential.claims?.forEach((claim: DcqlClaimDto) => {
-        if (claim.path && Array.isArray(claim.path)) {
-          claim.path.forEach((pathElement: string | number | string[]) => {
-            if (typeof pathElement === 'string') {
-              const claimName = pathElement.replace(/^\$\./, '');
-              if (!DISCLOSURE_EXCLUDED.has(claimName)) {
-                if (!fieldPaths.includes(claimName)) {
-                  fieldPaths.push(claimName);
-                }
-              }
-            }
-          });
+      const claims = credential.claims ?? [];
+
+      claims.forEach((claim: DcqlClaimDto) => {
+        if (!Array.isArray(claim.path)) {
+          return;
+        }
+
+        const pathKey = claim.path.join('|');
+
+        if (!seenPaths.has(pathKey)) {
+          seenPaths.add(pathKey);
+          extractedClaims.push(claim);
         }
       });
     });
 
-    console.log("DCQL – Extracted required fields:", fieldPaths);
-    return fieldPaths;
+    return extractedClaims;
   }
-
-
 
   private async calculateSdHash(sdJwtPresentation: string): Promise<string> {
     const encoder = new TextEncoder();
@@ -305,9 +309,17 @@ export class CredentialVerificationV2 {
 
   private async createSelectiveDisclosureSdJwt(
     fullSdJwt: string,
-    requiredFields: string[]
+    requiredFields: DcqlClaimDto[]
   ): Promise<string> {
+
     const DISCLOSURE_EXCLUDED = new Set(['iss', 'nbf', 'exp', 'cnf', 'status']);
+
+    const requiredClaimNames = new Set(
+      requiredFields
+        .map(c => c.path)
+        .reduce((acc, p) => acc.concat(p ?? []), [])
+        .filter((p): p is string => typeof p === 'string')
+    );
 
     const parts = fullSdJwt.split('~');
     const jwtPart = parts[0];
@@ -322,9 +334,7 @@ export class CredentialVerificationV2 {
         if (!disclosure) return;
 
         const decodedDisclosure = JSON.parse(
-          new TextDecoder().decode(
-            this.base64UrlDecode(disclosure)
-          )
+          new TextDecoder().decode(this.base64UrlDecode(disclosure))
         ) as (string | unknown)[];
 
         if (Array.isArray(decodedDisclosure) && decodedDisclosure.length >= 2) {
@@ -334,13 +344,13 @@ export class CredentialVerificationV2 {
             return;
           }
 
-          if (requiredFields.includes(claimName)) {
+          if (requiredClaimNames.has(claimName)) {
             selectedDisclosures.push(disclosure);
             foundClaims.push(claimName);
             disclosureDetails.push({
               claimName,
               value: decodedDisclosure[2],
-              encoded: disclosure.substring(0, 30) + "..."
+              encoded: disclosure.substring(0, 30) + '...'
             });
           }
         }
@@ -356,11 +366,9 @@ export class CredentialVerificationV2 {
       presentation += '~';
     }
 
-    console.log("Final presentation format: JWT~disc1~disc2~...~");
+    console.log('Final presentation format: JWT~disc1~disc2~...~');
     return presentation;
   }
-
-
 
   private extractPayloadFromSdJwt(sdJwt: string): Record<string, unknown> {
     try {
@@ -376,29 +384,36 @@ export class CredentialVerificationV2 {
     }
   }
 
-  private validateRequiredFields(requiredFields: string[], payloadJson: Record<string, unknown>): string[] {
-    console.log("A", typeof(payloadJson));
+  private validateRequiredFields(requiredFields: DcqlClaimDto[], payloadJson: Record<string, unknown>): string[] {
     const RESERVED_CLAIMS = new Set(['iss', 'nbf', 'exp', 'cnf', 'vct', 'status']);
-    const missingFields: string[] = [];
 
-    requiredFields.forEach((field) => {
-      if (RESERVED_CLAIMS.has(field)) {
-        return;
+    const requiredClaimNames = requiredFields
+      .flatMap(claim => Array.isArray(claim.path) ? claim.path : [])
+      .filter((p): p is string => typeof p === 'string')
+      .filter(p => !RESERVED_CLAIMS.has(p));
+
+
+    const missingFields = requiredClaimNames.filter((claimName) => {
+
+      // présent en clair
+      if (claimName in payloadJson) {
+        return false;
       }
 
-      if (field in payloadJson) {
-        return;
+      // présent en selective disclosure (_sd)
+      if (
+        payloadJson._sd &&
+        Array.isArray(payloadJson._sd) &&
+        payloadJson._sd.length > 0
+      ) {
+        return false;
       }
 
-      if (payloadJson._sd && Array.isArray(payloadJson._sd) && (payloadJson._sd as unknown[]).length > 0) {
-        return;
-      }
-
-      missingFields.push(field);
+      return true;
     });
 
     if (missingFields.length > 0) {
-      console.warn("Missing required fields:", missingFields);
+      console.warn('Missing required fields:', missingFields);
     }
 
     return missingFields;
