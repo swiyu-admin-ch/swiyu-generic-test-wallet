@@ -142,13 +142,6 @@ export class ApiService {
       return throwError(() => new Error("No issuer_credential_url provided"));
     }
 
-    console.log(
-      "getCredentialV2 payload",
-      issuerCredentialUrl,
-      bearerToken,
-      payload
-    );
-
     const headers = new HttpHeaders({
       Authorization: `Bearer ${bearerToken}`,
       "SWIYU-API-Version": "2",

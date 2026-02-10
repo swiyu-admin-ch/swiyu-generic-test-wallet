@@ -144,6 +144,7 @@ export class CredentialVerificationV2 {
           this.responseSubmitted.set(true);
         },
         error: (error: Error) => {
+          this.responseSubmitted.set(false);
           console.error("Error during verification process:", error);
         }
       });
@@ -366,7 +367,6 @@ export class CredentialVerificationV2 {
       presentation += '~';
     }
 
-    console.log('Final presentation format: JWT~disc1~disc2~...~');
     return presentation;
   }
 

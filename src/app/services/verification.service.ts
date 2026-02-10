@@ -120,17 +120,7 @@ export class VerificationService {
             return [];
         }
 
-        const credentials: DcqlCredentialDto[] = [];
-
-        dcqlQuery.credentials.forEach((credential: DcqlCredentialDto) => {
-            credentials.push({
-                id: credential.id,
-                format: credential.format,
-                meta: credential.meta || {}
-            });
-        });
-
-        return credentials;
+        return dcqlQuery.credentials;
     }
 
     public async createVerifiablePresentation(

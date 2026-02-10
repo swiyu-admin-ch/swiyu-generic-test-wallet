@@ -72,13 +72,10 @@ export class CredentialIssuanceV1 {
       this.credentialService.decodeDeeplink(deeplink);
     this.deeplink.set(decodedDeeplink);
 
-    console.log("decodedDeeplink", decodedDeeplink);
-
     this.apiService
       .resolveOpenIdMetadataFromDeeplink(decodedDeeplink?.credential_issuer as string)
       .pipe(
         switchMap((metadata) => {
-          console.log("ICI 3 : ", typeof(metadata), metadata)
           if (metadata) {
             this.metadata.set(metadata);
             this.extractCredentialConfigurationsSupported(
@@ -102,7 +99,6 @@ export class CredentialIssuanceV1 {
           );
         }),
         switchMap((accessToken: OAuthToken) => {
-          console.log("accessToken", accessToken);
           this.tokenResponse.set(accessToken);
           this.nonceResponse.set(accessToken?.c_nonce);
 
@@ -116,14 +112,12 @@ export class CredentialIssuanceV1 {
           );
         }),
         switchMap((credentialResponse: CredentialResponse) => {
-          console.log("credentialResponse", credentialResponse);
           const token = (credentialResponse.credential as string).split("~")[0];
           const decoded = jose.decodeJwt(token) as JwtPayload;
           this.encodedCredential.set(credentialResponse);
           return this.apiService.getRegistryEntry(decoded.iss as string);
         }),
         switchMap((registryEntry: RegistryEntry[]) => {
-          console.log("ICI : ", registryEntry);
           this.registryEntry.set(registryEntry);
           return of(registryEntry);
         }),
@@ -213,7 +207,6 @@ export class CredentialIssuanceV1 {
       },
       holder_public_key: holderPublicKey,
     };
-    console.log("payload with holder public key", payload);
     return payload;
   }
 

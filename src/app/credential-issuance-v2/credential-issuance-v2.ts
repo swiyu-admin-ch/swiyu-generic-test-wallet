@@ -73,8 +73,6 @@ export class CredentialIssuanceV2 {
       .resolveOpenIdMetadataFromDeeplink(decodedDeeplink?.credential_issuer as string)
       .pipe(
         switchMap((metadata) => {
-
-          console.log("Any C : ", typeof(metadata));
           if (metadata) {
             this.metadata.set(metadata);
             this.extractCredentialConfigurationsSupported(
@@ -121,12 +119,10 @@ export class CredentialIssuanceV2 {
           const token = credential.split("~")[0];
           const decoded = jose.decodeJwt(token) as JwtPayload;
           this.encodedCredential.set(credential);
-          console.log("decoded", decoded);
           return this.apiService.getRegistryEntry(decoded.iss as string);
         }),
         switchMap((registryEntry: RegistryEntry[]) => {
           const jwt = (this.encodedCredential() as string).split("~")[0];
-          console.log("registryEntry", registryEntry);
           this.registryEntry.set(registryEntry);
           return of(
             this.credentialService.decodeResponse(

@@ -136,6 +136,7 @@ export class CredentialVerificationV1 {
           this.responseSubmitted.set(true);
         },
         error: (error: Error) => {
+          this.responseSubmitted.set(false);
           console.error("Error during verification process:", error);
         }
       });
@@ -190,7 +191,6 @@ export class CredentialVerificationV1 {
         this.decodedHeader.set(headerJson);
 
         this.decodedPayload.set(payloadJson);
-        console.log("ICI ", payloadJson, typeof(payloadJson))
         this.credentialValid.set(true);
         this.credentialValidationError.set(undefined);
         return true;
@@ -332,7 +332,6 @@ export class CredentialVerificationV1 {
             this.base64UrlDecode(payloadB64)
           )
         ) as Record<string, unknown>;
-        console.log("ANY B " + typeof(payloadJson))
         return await this.createSdJwtWithDisclosures(jwtPart, payloadJson, requiredFields);
       }
 

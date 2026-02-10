@@ -69,8 +69,6 @@ export class Credential implements OnChanges {
     const decodedPayload = (await jose.decodeJwt(token[0])) as JwtPayload;
     const decodedHeader = (await jose.decodeProtectedHeader(token[0])) as JwtPayload;
 
-    console.log("decodedHeader", decodedHeader, decodedPayload);
-    console.log("registryEntry", this.registryEntry);
     if (this.registryEntry) {
       const registryValue = this.registryEntry[3] as Record<string, unknown>;
       const verificationMethods = (registryValue?.value as Record<string, unknown>)?.verificationMethod as Record<string, unknown>[];
@@ -100,22 +98,16 @@ export class Credential implements OnChanges {
 
   public ngOnChanges(changes: SimpleChanges): void {
     // changes.prop contains the old and the new value...
-    console.log("Credential changed", changes, this.encodedCredential);
     if (this.encodedCredential != null) {
       this.getCredentialDetails();
     }
   }
 
   public onResolve(input: string): void {
-    console.log("Credential changed", input);
     this.encodedCredential = input;
   }
 
   public getDisclosureEntries(disclosure: Record<string, unknown>[]): Record<string, unknown>[] {
-    console.log(disclosure);
-    console.log(disclosure[0]);
-    console.log(disclosure[1]);
-    console.log(disclosure[2]);
     return disclosure;
   }
 
