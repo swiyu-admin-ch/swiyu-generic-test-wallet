@@ -1,25 +1,27 @@
 import {Injectable} from '@angular/core';
 import * as jose from "jose";
+import { RegistryEntry, JwtPayload } from "@app/models/api-response";
 
 @Injectable({
     providedIn: 'root'
 })
 export class CredentialService {
 
-    public decodeDeeplink(url: string): string {
+    public decodeDeeplink(url: string): Record<string, unknown> {
         if (!url) {
-            return 'No url provided';
+            throw new Error('No url provided');
         }
         if (url.startsWith('swiyu://')) {
             const decodedUri = decodeURIComponent(url);
             const json = this.getCredentialOfferString(decodedUri);
             try {
-                return JSON.parse(json);
+                return JSON.parse(json) as Record<string, unknown>;
             } catch (error) {
                 console.error(error);
-                return json;
+                throw new Error(`Failed to parse credential offer: ${error}`);
             }
         }
+        throw new Error('Invalid deeplink format');
     }
 
     public async createHolderBinding(
@@ -29,7 +31,7 @@ export class CredentialService {
         privateKey: CryptoKey,
         jwk: jose.JWK
     ): Promise<string> {
-        const claims = {
+        const claims: Record<string, unknown> = {
             "aud": credentialIssuer,
             "iat": Math.floor(Date.now() / 1000),
             nonce
@@ -45,13 +47,16 @@ export class CredentialService {
         return jwt;
     }
 
-    public async decodeResponse(jwt: string, registryEntry: any[]): Promise<{ payload: jose.JWTPayload, protectedHeader: jose.JWTHeaderParameters, }> {
-        const kid = jose.decodeProtectedHeader(jwt).kid;
-        const verificationMethod = registryEntry[3]?.value?.verificationMethod.map(meth => meth.id === kid ? meth : null).filter(meth => meth != null)[0];
-        const jwk = verificationMethod?.publicKeyJwk;
+    public async decodeResponse(jwt: string, registryEntry: RegistryEntry[]): Promise<{ payload: JwtPayload, protectedHeader: JwtPayload, }> {
+        const kid = (jose.decodeProtectedHeader(jwt) as JwtPayload).kid;
+        const verificationMethods = (registryEntry[3] as Record<string, unknown>)?.value as Record<string, unknown>;
+        const verificationMethod = ((verificationMethods?.verificationMethod as Record<string, unknown>[]) || [])
+            .map(meth => (meth as Record<string, unknown>).id === kid ? meth : null)
+            .filter((meth: Record<string, unknown> | null): meth is Record<string, unknown> => meth != null)[0];
+        const jwk = verificationMethod?.publicKeyJwk as CryptoKey;
         const {payload, protectedHeader} = await jose.jwtVerify(jwt, jwk, {})
 
-        return {payload, protectedHeader};
+        return {payload: payload as JwtPayload, protectedHeader: protectedHeader as JwtPayload};
     }
 
 

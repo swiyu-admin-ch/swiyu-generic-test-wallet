@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import * as jose from "jose";
 import { DcqlCredentialDto, DcqlQueryDto, Field, InputDescriptor, PresentationDefinition } from 'src/generated/verifier';
+import { JwtPayload, RegistryEntry } from "@app/models/api-response";
 
 @Injectable({
     providedIn: 'root'
@@ -37,7 +38,7 @@ export class VerificationService {
         privateKey: CryptoKey,
         jwk: jose.JWK
     ): Promise<string> {
-        const claims = {
+        const claims: Record<string, unknown> = {
             "aud": credentialIssuer,
             "iat": Math.floor(Date.now() / 1000),
             nonce
@@ -53,15 +54,17 @@ export class VerificationService {
         return jwt;
     }
 
-    public async decodeResponse(jwt: string, registryEntry: any[]): Promise<{ payload: jose.JWTPayload, protectedHeader: jose.JWTHeaderParameters, }> {
+    public async decodeResponse(jwt: string, registryEntry: RegistryEntry[]): Promise<{ payload: JwtPayload, protectedHeader: JwtPayload }> {
 
-        const kid = jose.decodeProtectedHeader(jwt).kid;
-        const verificationMethod = registryEntry[3]?.value?.verificationMethod.map(meth => meth.id === kid ? meth : null).filter(meth => meth != null)[0];
-        const jwk = verificationMethod?.publicKeyJwk;
-        const { payload, protectedHeader } = await jose.jwtVerify(jwt, jwk, {
-        })
+        const kid = (jose.decodeProtectedHeader(jwt) as JwtPayload).kid;
+        const verificationMethods = (registryEntry[3] as Record<string, unknown>)?.value as Record<string, unknown>;
+        const verificationMethod = ((verificationMethods?.verificationMethod as Record<string, unknown>[]) || [])
+            .map(meth => (meth as Record<string, unknown>).id === kid ? meth : null)
+            .filter((meth: Record<string, unknown> | null): meth is Record<string, unknown> => meth != null)[0];
+        const jwk = verificationMethod?.publicKeyJwk as CryptoKey;
+        const { payload, protectedHeader } = await jose.jwtVerify(jwt, jwk, {})
 
-        return { payload, protectedHeader };
+        return { payload: payload as JwtPayload, protectedHeader: protectedHeader as JwtPayload };
     }
 
     public async createKeySet(): Promise<{ publicKey: CryptoKey, privateKey: CryptoKey, jwk: jose.JWK }> {
@@ -79,30 +82,38 @@ export class VerificationService {
     }
 
 
-    public extractRequiredClaimsFromPresentationDefinition(presentationDefinition: PresentationDefinition): Field[] {
+    public extractFieldsFromPresentationDefinition(
+        presentationDefinition: PresentationDefinition | undefined
+    ): Field[] {
+
         if (!presentationDefinition?.input_descriptors) {
             return [];
         }
 
-        const requiredClaims: Field[] = [];
+        const extractedFields: Field[] = [];
+        const seenPaths = new Set<string>();
 
         presentationDefinition.input_descriptors.forEach((descriptor: InputDescriptor) => {
-            if (descriptor.constraints?.fields) {
-                descriptor.constraints.fields.forEach((field: Field) => {
-                    //@TODO
-                    requiredClaims.push(field);
-                    // requiredClaims.push({
-                    //     path: field.path,
-                    //     filter: field.filter,
-                    //     required: false,
-                    //     //required: field.optional !== true @TODO
-                    // });
-                });
-            }
+            const fields = descriptor.constraints?.fields ?? [];
+
+            fields.forEach((field: Field) => {
+                if (!Array.isArray(field.path)) {
+                    return;
+                }
+
+                const pathKey = field.path.join('|');
+
+                if (!seenPaths.has(pathKey)) {
+                    seenPaths.add(pathKey);
+                    extractedFields.push(field);
+                }
+            });
         });
 
-        return requiredClaims;
+        return extractedFields;
     }
+
+
 
     public extractCredentialsFromDCQL(dcqlQuery: DcqlQueryDto): DcqlCredentialDto[] {
         if (!dcqlQuery?.credentials) {
@@ -129,7 +140,7 @@ export class VerificationService {
         privateKey: CryptoKey,
         jwk: jose.JWK
     ): Promise<string> {
-        const claims = {
+        const claims: Record<string, unknown> = {
             "iss": "did:example:holder",
             "aud": verifierId,
             "nonce": nonce,

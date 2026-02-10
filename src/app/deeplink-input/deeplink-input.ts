@@ -20,8 +20,8 @@ import {MatInput, MatInputModule} from "@angular/material/input";
     standalone: true
 })
 export class DeeplinkInput {
-    @Input() input;
-    @Input() label;
+    @Input() input: string;
+    @Input() label: string;
     @Output() inputChangeEvent = new EventEmitter<string>();
 
     public onSubmit(): void {

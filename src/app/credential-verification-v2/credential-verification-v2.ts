@@ -16,6 +16,7 @@ import { VerificationService } from "@services/verification.service";
 import { HolderKeyService } from "@services/holder-key.service";
 import { Router } from "@angular/router";
 import { DcqlClaimDto, DcqlCredentialDto, DcqlQueryDto, RequestObject } from "src/generated/verifier";
+import { JwtPayload } from "@app/models/api-response";
 
 @Component({
   selector: "app-credential-verification-v2",
@@ -58,8 +59,8 @@ export class CredentialVerificationV2 {
 
   credentialValid: WritableSignal<boolean> = signal(false);
   credentialValidationError: WritableSignal<string | undefined> = signal(undefined);
-  decodedHeader: WritableSignal<any> = signal(undefined);
-  decodedPayload: WritableSignal<any> = signal(undefined);
+  decodedHeader: WritableSignal<JwtPayload | undefined> = signal(undefined);
+  decodedPayload: WritableSignal<JwtPayload | undefined> = signal(undefined);
 
   constructor(
   ) {
@@ -77,20 +78,21 @@ export class CredentialVerificationV2 {
       return;
     }
 
-    const decodedDeeplink: any =
-      this.verificationService.decodeDeeplink(input);
+    const decodedDeeplink: Record<string, string> =
+      this.verificationService.decodeDeeplink(input) as Record<string, string>;
     this.deeplink.set(decodedDeeplink);
 
 
     this.apiService
       .resolveRequestObjectFromDeeplink(decodedDeeplink?.request_uri)
       .pipe(
-        switchMap((requestObject: RequestObject) => {
-          this.requestObject.set(requestObject);
-          this.dcqlQuery.set(requestObject?.dcql_query);
+        switchMap((requestObject: JwtPayload) => {
+          const reqObj = requestObject as unknown as RequestObject;
+          this.requestObject.set(reqObj);
+          this.dcqlQuery.set(reqObj?.dcql_query);
 
           const requiredCredentials = this.verificationService.extractCredentialsFromDCQL(
-            requestObject?.dcql_query
+            reqObj?.dcql_query
           );
           this.requiredCredentials.set(requiredCredentials);
 
@@ -100,7 +102,7 @@ export class CredentialVerificationV2 {
             return of(null);
           }
 
-          const requiredFields = this.extractFieldPathsFromDCQL(requestObject?.dcql_query);
+          const requiredFields = this.extractFieldPathsFromDCQL(reqObj?.dcql_query);
           const payloadJson = this.extractPayloadFromSdJwt(credentialString);
           const validationErrors = this.validateRequiredFields(requiredFields, payloadJson);
 
@@ -109,24 +111,25 @@ export class CredentialVerificationV2 {
             return of(null);
           }
 
-          const clientId = requestObject?.client_id;
+          const clientId = reqObj?.client_id as string;
 
           return from(this.createAndSignPresentation(
             credentialString,
             clientId,
-            requestObject?.nonce
+            reqObj?.nonce as string
           ));
         }),
-        switchMap((vpToken: any) => {
+        switchMap((vpToken: string | null) => {
           if (!vpToken) {
             return of(null);
           }
           this.vpToken.set(vpToken);
           const dcqlCredentials = this.dcqlQuery()?.credentials || [];
-          const credentialId = dcqlCredentials[0]?.id || "credential_1";
+          const firstCredential = dcqlCredentials[0];
+          const credentialId = (firstCredential?.id as string) || "credential_1";
 
           return this.apiService.submitVerificationResponseDcql(
-            this.requestObject()?.response_uri,
+            this.requestObject()?.response_uri as string,
             vpToken,
             credentialId
           );
@@ -136,7 +139,7 @@ export class CredentialVerificationV2 {
         next: () => {
           this.responseSubmitted.set(true);
         },
-        error: (error) => {
+        error: (error: Error) => {
           console.error("Error during verification process:", error);
         }
       });
@@ -224,8 +227,6 @@ export class CredentialVerificationV2 {
 
     const requiredFields = this.extractFieldPathsFromDCQL(this.dcqlQuery());
 
-
-
     const selectiveDisclosureSdJwt = await this.createSelectiveDisclosureSdJwt(
       originalSdJwt,
       requiredFields
@@ -233,7 +234,7 @@ export class CredentialVerificationV2 {
 
     const sdHash = await this.calculateSdHash(selectiveDisclosureSdJwt);
 
-    const kbJwtPayload = {
+    const kbJwtPayload: Record<string, unknown> = {
       sd_hash: sdHash,
       aud: [verifierId],
       nonce: nonce,
@@ -292,7 +293,7 @@ export class CredentialVerificationV2 {
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
 
-    const hashBase64Standard = btoa(String.fromCharCode.apply(null, hashArray as any));
+    const hashBase64Standard = btoa(String.fromCharCode.apply(null, hashArray as unknown as number[]));
 
     const hashBase64Url = hashBase64Standard
       .replace(/\+/g, '-')
@@ -314,7 +315,7 @@ export class CredentialVerificationV2 {
 
     const selectedDisclosures: string[] = [];
     const foundClaims: string[] = [];
-    const disclosureDetails: any[] = [];
+    const disclosureDetails: Record<string, unknown>[] = [];
 
     disclosureParts.forEach((disclosure: string, index: number) => {
       try {
@@ -324,10 +325,10 @@ export class CredentialVerificationV2 {
           new TextDecoder().decode(
             this.base64UrlDecode(disclosure)
           )
-        );
+        ) as (string | unknown)[];
 
         if (Array.isArray(decodedDisclosure) && decodedDisclosure.length >= 2) {
-          const claimName = decodedDisclosure[1];
+          const claimName = decodedDisclosure[1] as string;
 
           if (DISCLOSURE_EXCLUDED.has(claimName)) {
             return;
@@ -361,21 +362,21 @@ export class CredentialVerificationV2 {
 
 
 
-  private extractPayloadFromSdJwt(sdJwt: string): any {
+  private extractPayloadFromSdJwt(sdJwt: string): Record<string, unknown> {
     try {
       const parts = sdJwt.split('~');
       const jwtPart = parts[0];
       const [, payloadB64] = jwtPart.split('.');
       return JSON.parse(
         new TextDecoder().decode(this.base64UrlDecode(payloadB64))
-      );
+      ) as Record<string, unknown>;
     } catch (error) {
       console.error("Failed to extract payload from SD-JWT:", error);
       return {};
     }
   }
 
-  private validateRequiredFields(requiredFields: string[], payloadJson: any): string[] {
+  private validateRequiredFields(requiredFields: string[], payloadJson: Record<string, unknown>): string[] {
     console.log("A", typeof(payloadJson));
     const RESERVED_CLAIMS = new Set(['iss', 'nbf', 'exp', 'cnf', 'vct', 'status']);
     const missingFields: string[] = [];
@@ -389,7 +390,7 @@ export class CredentialVerificationV2 {
         return;
       }
 
-      if (payloadJson._sd && Array.isArray(payloadJson._sd) && payloadJson._sd.length > 0) {
+      if (payloadJson._sd && Array.isArray(payloadJson._sd) && (payloadJson._sd as unknown[]).length > 0) {
         return;
       }
 

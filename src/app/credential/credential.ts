@@ -26,6 +26,7 @@ import { DeeplinkInput } from "../deeplink-input/deeplink-input";
 import { MatButton } from "@angular/material/button";
 import { MatIcon } from "@angular/material/icon";
 import { Router } from "@angular/router";
+import { JwtPayload, RegistryEntry } from "@app/models/api-response";
 
 @Component({
   selector: "app-credential",
@@ -54,50 +55,53 @@ import { Router } from "@angular/router";
 })
 export class Credential implements OnChanges {
   @Input({ required: true }) encodedCredential: string;
-  @Input({ required: true }) registryEntry: any[];
+  @Input({ required: true }) registryEntry: RegistryEntry[];
 
   private router = inject(Router);
 
-  decodedHeader: WritableSignal<any> = signal(undefined);
-  decodedPayload: WritableSignal<any> = signal(undefined);
-  disclosures = signal([]);
+  decodedHeader: WritableSignal<JwtPayload | undefined> = signal(undefined);
+  decodedPayload: WritableSignal<JwtPayload | undefined> = signal(undefined);
+  disclosures: WritableSignal<Record<string, unknown>[]> = signal([]);
 
   async getCredentialDetails(): Promise<void> {
     const token = this.encodedCredential.split("~");
 
-    const decodedPayload = await jose.decodeJwt(token[0]);
-    const decodedHeader = await jose.decodeProtectedHeader(token[0]);
+    const decodedPayload = (await jose.decodeJwt(token[0])) as JwtPayload;
+    const decodedHeader = (await jose.decodeProtectedHeader(token[0])) as JwtPayload;
 
     console.log("decodedHeader", decodedHeader, decodedPayload);
     console.log("registryEntry", this.registryEntry);
     if (this.registryEntry) {
+      const registryValue = this.registryEntry[3] as Record<string, unknown>;
+      const verificationMethods = (registryValue?.value as Record<string, unknown>)?.verificationMethod as Record<string, unknown>[];
+
       const verificationMethod =
-        this.registryEntry[3]?.value?.verificationMethod
-          .map((verificationMethod) =>
+        verificationMethods
+          .map((verificationMethod: Record<string, unknown>) =>
             verificationMethod.id === decodedHeader.kid
               ? verificationMethod
               : null
           )
-          .filter((verificationMethod) => verificationMethod != null)[0];
+          .filter((verificationMethod: Record<string, unknown> | null): verificationMethod is Record<string, unknown> => verificationMethod != null)[0];
       const jwk = verificationMethod?.publicKeyJwk;
-      const { payload, protectedHeader } = await jose.jwtVerify(token[0], jwk);
-      this.decodedHeader.set(protectedHeader);
-      this.decodedPayload.set(payload);
+      const { payload, protectedHeader } = await jose.jwtVerify(token[0], jwk as CryptoKey);
+      this.decodedHeader.set(protectedHeader as JwtPayload);
+      this.decodedPayload.set(payload as JwtPayload);
 
-      const disclosures: any[] = [];
+      const disclosures: Record<string, unknown>[] = [];
 
       for (let i = 1; i < token.length - 1; i++) {
-        disclosures.push(JSON.parse(this.base64UrlDecode(token[i])));
+        disclosures.push(JSON.parse(this.base64UrlDecode(token[i])) as Record<string, unknown>);
       }
 
       this.disclosures.set(disclosures);
     }
   }
 
-  public ngOnChanges(changes: SimpleChanges) {
+  public ngOnChanges(changes: SimpleChanges): void {
     // changes.prop contains the old and the new value...
     console.log("Credential changed", changes, this.encodedCredential);
-    if (this.encodedCredential != undefined) {
+    if (this.encodedCredential != null) {
       this.getCredentialDetails();
     }
   }
@@ -107,7 +111,7 @@ export class Credential implements OnChanges {
     this.encodedCredential = input;
   }
 
-  public getDisclosureEntries(disclosure: string[]) {
+  public getDisclosureEntries(disclosure: Record<string, unknown>[]): Record<string, unknown>[] {
     console.log(disclosure);
     console.log(disclosure[0]);
     console.log(disclosure[1]);
@@ -117,18 +121,18 @@ export class Credential implements OnChanges {
 
   private base64UrlDecode(input: string): string {
     // convert base64url to base64
-    input = input.replace(/-/g, "+").replace(/_/g, "/");
-    const pad = input.length % 4;
-    if (pad) input += "=".repeat(4 - pad);
+    let decodedInput = input.replace(/-/g, "+").replace(/_/g, "/");
+    const pad = decodedInput.length % 4;
+    if (pad) decodedInput += "=".repeat(4 - pad);
 
     // decode to bytes and decode UTF-8
-    const bytes = Uint8Array.from(atob(input), (c) => c.charCodeAt(0));
+    const bytes = Uint8Array.from(atob(decodedInput), (c) => c.charCodeAt(0));
     return new TextDecoder().decode(bytes);
   }
 
   public copyCredentialToClipboard(): void {
     if (this.encodedCredential) {
-      navigator.clipboard.writeText(this.encodedCredential).then(
+      void navigator.clipboard.writeText(this.encodedCredential).then(
         () => {
           console.log("Credential copied to clipboard");
         },

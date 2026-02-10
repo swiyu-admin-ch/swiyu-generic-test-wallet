@@ -14,7 +14,7 @@ import {MatListItem} from "@angular/material/list";
     standalone: true
 })
 export class ChecklistEntry {
-    data: InputSignal<any> = input.required();
-    validData: InputSignal<any> = input.required();
+    data: InputSignal<Record<string, unknown>> = input.required();
+    validData: InputSignal<Record<string, unknown>> = input.required();
     text: InputSignal<string> = input.required();
 }

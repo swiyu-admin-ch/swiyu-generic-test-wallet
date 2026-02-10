@@ -1,5 +1,5 @@
 import { Component, inject, signal, WritableSignal } from "@angular/core";
-import { ProtectedHeaderParameters, SignJWT } from "jose";
+import { SignJWT } from "jose";
 import { ApiService } from "../api-service";
 import { FormsModule } from "@angular/forms";
 import { from, of, switchMap } from "rxjs";
@@ -16,7 +16,8 @@ import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { VerificationService } from "@services/verification.service";
 import { HolderKeyService } from "@services/holder-key.service";
 import { Router } from "@angular/router";
-import { PresentationDefinition, RequestObject } from "src/generated/verifier";
+import { Field, PresentationDefinition, RequestObject } from "src/generated/verifier";
+import { JwtPayload } from "@app/models/api-response";
 
 @Component({
   selector: "app-credential-verification-v1",
@@ -51,18 +52,18 @@ export class CredentialVerificationV1 {
   public input =
     "swiyu-verify://?client_id=did%3Atdw%3AQmcsWxATnPMAcbjukjXAkVAUAKRSC71mjMWjod4NVWrZ9Y%3Amockserver%253A1080%3Aapi%3Av1%3Adid%3A64f74058-4fa3-4609-a7b4-dd6a8853bc32&request_uri=http%3A%2F%2Fdefault-verifier-url.admin.ch%2Foid4vp%2Fapi%2Frequest-object%2F9eafca2d-9bae-46a2-a81d-f3576809d2c0";
 
-  deeplink: WritableSignal<undefined | any> = signal(undefined);
+  deeplink: WritableSignal<Record<string, unknown> | undefined> = signal(undefined);
   requestObject: WritableSignal<RequestObject | undefined> = signal(undefined);
   presentationDefinition: WritableSignal<PresentationDefinition | undefined> = signal(undefined);
-  requiredClaims: WritableSignal<any[] | undefined> = signal(undefined);
+  requiredClaims: WritableSignal<Field[] | undefined> = signal(undefined);
   credentialInput: WritableSignal<string | undefined> = signal("");
   vpToken: WritableSignal<string | undefined> = signal(undefined);
   responseSubmitted: WritableSignal<boolean> = signal(false);
 
   credentialValid: WritableSignal<boolean> = signal(false);
   credentialValidationError: WritableSignal<string | undefined> = signal(undefined);
-  decodedHeader: WritableSignal<ProtectedHeaderParameters | undefined> = signal(undefined);
-  decodedPayload: WritableSignal<any | undefined> = signal(undefined);
+  decodedHeader: WritableSignal<JwtPayload | undefined> = signal(undefined);
+  decodedPayload: WritableSignal<JwtPayload | undefined> = signal(undefined);
 
   constructor() {
     const navigation = this.router.getCurrentNavigation();
@@ -79,7 +80,7 @@ export class CredentialVerificationV1 {
       return;
     }
 
-    const decodedDeeplink: any =
+    const decodedDeeplink: Record<string, unknown> =
       this.verificationService.decodeDeeplink(input);
     this.deeplink.set(decodedDeeplink);
 
@@ -90,26 +91,27 @@ export class CredentialVerificationV1 {
     }
 
     this.apiService
-      .resolveRequestObjectFromDeeplink(decodedDeeplink?.request_uri)
+      .resolveRequestObjectFromDeeplink(decodedDeeplink?.request_uri as string)
       .pipe(
-        switchMap((requestObject: RequestObject) => {
-          this.requestObject.set(requestObject);
-          this.presentationDefinition.set(requestObject?.presentation_definition);
+        switchMap((requestObject: JwtPayload) => {
+          const reqObj = requestObject as unknown as RequestObject;
+          this.requestObject.set(reqObj);
+          this.presentationDefinition.set(reqObj?.presentation_definition);
 
-          const requiredClaims = this.verificationService.extractRequiredClaimsFromPresentationDefinition(
-            requestObject?.presentation_definition
+          const requiredClaims = this.verificationService.extractFieldsFromPresentationDefinition(
+            reqObj?.presentation_definition
           );
           this.requiredClaims.set(requiredClaims);
 
-          const clientId = requestObject?.client_id;
+          const clientId = reqObj?.client_id as string;
 
           return from(this.createAndSignPresentation(
             credentialString,
             clientId,
-            requestObject?.nonce
+            reqObj?.nonce as string
           ));
         }),
-        switchMap((vpToken: any) => {
+        switchMap((vpToken: string) => {
           if (!vpToken) {
             return of(null);
           }
@@ -119,7 +121,7 @@ export class CredentialVerificationV1 {
           );
 
           return this.apiService.submitVerificationResponse(
-            this.requestObject()?.response_uri,
+            this.requestObject()?.response_uri as string,
             vpToken,
             presentationSubmission
           );
@@ -129,7 +131,7 @@ export class CredentialVerificationV1 {
         next: () => {
           this.responseSubmitted.set(true);
         },
-        error: (error) => {
+        error: (error: Error) => {
           console.error("Error during verification process:", error);
         }
       });
@@ -176,10 +178,10 @@ export class CredentialVerificationV1 {
       try {
         const headerJson = JSON.parse(
           new TextDecoder().decode(this.base64UrlDecode(jwtComponents[0]))
-        );
+        ) as JwtPayload;
         const payloadJson = JSON.parse(
           new TextDecoder().decode(this.base64UrlDecode(jwtComponents[1]))
-        );
+        ) as JwtPayload;
 
         this.decodedHeader.set(headerJson);
 
@@ -219,7 +221,7 @@ export class CredentialVerificationV1 {
 
     const sdHash = await this.calculateSdHash(selectiveDisclosureSdJwt);
 
-    const kbJwtPayload = {
+    const kbJwtPayload: Record<string, unknown> = {
       sd_hash: sdHash,
       aud: [verifierId],
       nonce: nonce,
@@ -259,7 +261,7 @@ export class CredentialVerificationV1 {
     return hashBase64Url;
   }
 
-  private createPresentationSubmission(presentationDefinition: PresentationDefinition): { id: string, definition_id: string, descriptor_map: any[]} {
+  private createPresentationSubmission(presentationDefinition: PresentationDefinition | undefined): Record<string, unknown> {
     if (!presentationDefinition?.input_descriptors) {
       return {
         id: "presentation_submission",
@@ -268,7 +270,7 @@ export class CredentialVerificationV1 {
       };
     }
 
-    const descriptorMap = presentationDefinition.input_descriptors.map((descriptor: any) => ({
+    const descriptorMap = presentationDefinition.input_descriptors.map((descriptor) => ({
       id: descriptor.id,
       format: "vc+sd-jwt",
       path: "$"
@@ -281,7 +283,7 @@ export class CredentialVerificationV1 {
     };
   }
 
-  private extractFieldPathsFromPresentationDefinition(presentationDefinition: any): string[] {
+  private extractFieldPathsFromPresentationDefinition(presentationDefinition: PresentationDefinition | undefined): string[] {
     const fieldPaths: string[] = [];
 
     if (!presentationDefinition) {
@@ -289,14 +291,17 @@ export class CredentialVerificationV1 {
     }
 
     if (presentationDefinition.input_descriptors) {
-      presentationDefinition.input_descriptors.forEach((descriptor: any) => {
-        if (descriptor.constraints?.fields) {
-          descriptor.constraints.fields.forEach((field: any) => {
+      presentationDefinition.input_descriptors.forEach((descriptor) => {
+        const constraints = descriptor.constraints;
+        if (constraints?.fields) {
+          constraints.fields.forEach((field) => {
             if (field.path && Array.isArray(field.path)) {
-              field.path.forEach((path: string) => {
-                const claimName = path.replace(/^\$\./, '');
-                if (claimName && !fieldPaths.includes(claimName)) {
-                  fieldPaths.push(claimName);
+              field.path.forEach((path) => {
+                if (typeof path === 'string') {
+                  const claimName = path.replace(/^\$\./, '');
+                  if (claimName && !fieldPaths.includes(claimName)) {
+                    fieldPaths.push(claimName);
+                  }
                 }
               });
             }
@@ -322,7 +327,7 @@ export class CredentialVerificationV1 {
           new TextDecoder().decode(
             this.base64UrlDecode(payloadB64)
           )
-        );
+        ) as Record<string, unknown>;
         console.log("ANY B " + typeof(payloadJson))
         return await this.createSdJwtWithDisclosures(jwtPart, payloadJson, requiredFields);
       }
@@ -336,15 +341,15 @@ export class CredentialVerificationV1 {
             return;
           }
 
-          const decodedDisclosure = JSON.parse(
-            new TextDecoder().decode(
-              this.base64UrlDecode(disclosure)
-            )
-          );
+        const decodedDisclosure = JSON.parse(
+          new TextDecoder().decode(
+            this.base64UrlDecode(disclosure)
+          )
+        ) as (string | unknown)[];
 
-          if (Array.isArray(decodedDisclosure) && decodedDisclosure.length >= 2) {
-            const claimName = decodedDisclosure[1];
-            if (requiredFields.includes(claimName)) {
+        if (Array.isArray(decodedDisclosure) && decodedDisclosure.length >= 2) {
+          const claimName = decodedDisclosure[1];
+          if (typeof claimName === 'string' && requiredFields.includes(claimName)) {
               selectedDisclosures.push(disclosure);
             }
           }
@@ -369,7 +374,7 @@ export class CredentialVerificationV1 {
 
   private async createSdJwtWithDisclosures(
     jwtPart: string,
-    payloadJson: any,
+    payloadJson: Record<string, unknown>,
     requiredFields: string[]
   ): Promise<string> {
     const disclosures: string[] = [];
