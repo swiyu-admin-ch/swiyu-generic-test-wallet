@@ -15,7 +15,7 @@ import { CredentialService } from "@services/credential.service";
 import { DeeplinkInput } from "../deeplink-input/deeplink-input";
 import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { HolderKeyService } from "@services/holder-key.service";
-import { NonceResponse, OAuthToken } from "src/generated/issuer";
+import { IssuerCredentialRequestEncryption, IssuerCredentialResponseEncryption, NonceResponse, OAuthToken } from "src/generated/issuer";
 import { JwtPayload, OpenIdMetadataResponse, CredentialResponse, RegistryEntry } from "@app/models/api-response";
 
 @Component({
@@ -56,6 +56,9 @@ export class CredentialIssuanceV2 {
   decodedHeader: WritableSignal<JwtPayload | undefined> = signal(undefined);
   registryEntry: WritableSignal<RegistryEntry[] | undefined> = signal(undefined);
 
+  credentialRequestEncryption: WritableSignal<IssuerCredentialRequestEncryption | undefined> = signal(undefined);
+  credentialResponseEncryption: WritableSignal<IssuerCredentialResponseEncryption | undefined> = signal(undefined);
+
   public onClear(): void {
     this.reset();
   }
@@ -71,6 +74,8 @@ export class CredentialIssuanceV2 {
       .pipe(
         switchMap((metadata) => {
           if (metadata) {
+            this.credentialRequestEncryption.set(metadata.credential_request_encryption);
+            this.credentialResponseEncryption.set(metadata.credential_response_encryption);
             this.metadata.set(metadata);
             this.extractCredentialConfigurationsSupported(
               decodedDeeplink,
@@ -106,7 +111,7 @@ export class CredentialIssuanceV2 {
         }),
         switchMap((request: Record<string, unknown>) => {
           return this.apiService.getCredentialV2(
-            (this.metadata() as OpenIdMetadataResponse)?.["credential_endpoint"] as string,
+            this.metadata(),
             (this.tokenResponse() as OAuthToken)?.access_token,
             request as CredentialResponse
           );

@@ -3,7 +3,9 @@
  * Used for responses that don't have specific generated types
  */
 
-export type OpenIdMetadataResponse = Record<string, unknown>;
+import { OpenIdIssuerMetadata } from "./open-id-issuer-metadata";
+
+export type OpenIdMetadataResponse = OpenIdIssuerMetadata;
 
 export type OpenIdConfigResponse = Record<string, unknown>;
 

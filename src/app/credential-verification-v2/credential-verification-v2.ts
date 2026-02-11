@@ -7,7 +7,7 @@ import { PanelComponent } from "../deeplink-resolver/panel.component";
 import { ChecklistEntry } from "../checklist-entry/checklist-entry";
 import { MatList } from "@angular/material/list";
 import { MatAccordion } from "@angular/material/expansion";
-import { JsonPipe, SlicePipe, CommonModule } from "@angular/common";
+import { JsonPipe, CommonModule } from "@angular/common";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
 import { DeeplinkInput } from "../deeplink-input/deeplink-input";
@@ -26,7 +26,6 @@ import { JwtPayload } from "@app/models/api-response";
     MatList,
     MatAccordion,
     JsonPipe,
-    SlicePipe,
     CommonModule,
     MatFormFieldModule,
     MatInputModule,
