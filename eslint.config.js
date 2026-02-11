@@ -32,6 +32,13 @@ module.exports = defineConfig([
         },
       ],
     },
+    ignores: [
+      'dist/**',
+      'coverage/**',
+      'node_modules/**',
+      'src/generated/**',
+      'src/assets/**'
+    ]
   },
   {
     files: ["**/*.html"],
@@ -40,5 +47,6 @@ module.exports = defineConfig([
       angular.configs.templateAccessibility,
     ],
     rules: {},
-  }
+  },
+
 ]);

@@ -1,4 +1,4 @@
-import { Injectable } from "@angular/core";
+import { inject, Injectable } from "@angular/core";
 import {
   HttpClient,
   HttpErrorResponse,
@@ -6,18 +6,28 @@ import {
   HttpParams,
 } from "@angular/common/http";
 import { catchError, Observable, throwError, map } from "rxjs";
+import { NonceResponse, OAuthToken } from "src/generated/issuer";
+import {
+  OpenIdMetadataResponse,
+  OpenIdConfigResponse,
+  JwtPayload,
+  CredentialResponse,
+  PresentationSubmission,
+  VpTokenMap,
+  RegistryEntry
+} from "@app/models/api-response";
 
 @Injectable({
   providedIn: "root",
 })
 export class ApiService {
-  constructor(private http: HttpClient) {}
+  private http = inject(HttpClient)
 
   public resolveOpenIdMetadataFromDeeplink(
     issuerCredentialUrl: string
-  ): Observable<any> {
+  ): Observable<OpenIdMetadataResponse> {
     return this.http
-      .get<any>(`${issuerCredentialUrl}/.well-known/openid-credential-issuer`, {
+      .get<OpenIdMetadataResponse>(`${issuerCredentialUrl}/.well-known/openid-credential-issuer`, {
         responseType: "json",
       })
       .pipe(catchError(this.handleError));
@@ -25,13 +35,13 @@ export class ApiService {
 
   public resolveOpenIdConfigMetadataFromDeeplink(
     issuerCredentialUrl: string
-  ): any {
+  ): Observable<OpenIdConfigResponse> {
     if (!issuerCredentialUrl) {
-      return "No issuer_credential_url provided";
+      return throwError(() => new Error("No issuer_credential_url provided"));
     }
 
     return this.http
-      .get<any>(`${issuerCredentialUrl}/.well-known/openid-configuration`, {
+      .get<OpenIdConfigResponse>(`${issuerCredentialUrl}/.well-known/openid-configuration`, {
         responseType: "json",
       })
       .pipe(catchError(this.handleError));
@@ -39,20 +49,21 @@ export class ApiService {
 
   public resolveRequestObjectFromDeeplink(
     verifierRequestObjectUrl: string
-  ) : any {
+  ): Observable<JwtPayload> {
     if (!verifierRequestObjectUrl) {
       return throwError(() => new Error("No verifier request object URL provided"));
     }
 
-    return this.http
-      .get<any>(`${verifierRequestObjectUrl}`, {
-        responseType: "text" as any,
-      })
+    return (this.http
+      .get(`${verifierRequestObjectUrl}`, {
+        responseType: "text",
+      }) as Observable<string>)
       .pipe(
-        map((response: string) => {
+        map((response: string): JwtPayload => {
           try {
-            return JSON.parse(response);
-          } catch (e) {
+            return JSON.parse(response) as JwtPayload;
+          } catch (error) {
+            console.log(error);
             return this.decodeJwtPayload(response);
           }
         }),
@@ -60,7 +71,7 @@ export class ApiService {
       );
   }
 
-  private decodeJwtPayload(token: string): any {
+  private decodeJwtPayload(token: string): JwtPayload {
     try {
       const parts = token.split('.');
       if (parts.length !== 3) {
@@ -69,13 +80,13 @@ export class ApiService {
 
       const payload = parts[1];
       const decoded = atob(payload);
-      return JSON.parse(decoded);
+      return JSON.parse(decoded) as JwtPayload;
     } catch (error) {
       throw new Error(`Failed to decode JWT payload: ${error}`);
     }
   }
 
-  public getAccessToken(preAuthCode: string, tokenEndpointUrl: string): any {
+  public getAccessToken(preAuthCode: string, tokenEndpointUrl: string): Observable<OAuthToken> {
     if (!preAuthCode || !tokenEndpointUrl) {
       return throwError(() => new Error("No pre-authorized code provided"));
     }
@@ -85,21 +96,21 @@ export class ApiService {
       .set("pre-authorized_code", preAuthCode);
 
     return this.http
-      .post<any>(tokenEndpointUrl, body.toString(), {
+      .post<OAuthToken>(tokenEndpointUrl, body.toString(), {
         responseType: "json",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       })
-      .pipe(catchError((err) => this.handleError(err)));
+      .pipe(catchError((err: HttpErrorResponse) => this.handleError(err)));
   }
 
-  public getNonce(nonceEndpoint: string): any {
+  public getNonce(nonceEndpoint: string): Observable<NonceResponse> {
     if (!nonceEndpoint) {
-      throwError(() => new Error("No nonce_endpoint provided"));
+      return throwError(() => new Error("No nonce_endpoint provided"));
     }
 
-    // ${nonceEndpoint}/oid4vci/api/nonce
     return this.http
-      .post<any>(`${nonceEndpoint}`, {
+      .post<NonceResponse>(`${nonceEndpoint}`, {},
+        {
         responseType: "json",
       })
       .pipe(catchError(this.handleError));
@@ -108,14 +119,14 @@ export class ApiService {
   public getCredential(
     issuerCredentialUrl: string,
     bearerToken: string,
-    payload: any
-  ): any {
+    payload: CredentialResponse
+  ): Observable<CredentialResponse> {
     if (!issuerCredentialUrl) {
-      return "No issuer_credential_url provided";
+      return throwError(() => new Error("No issuer_credential_url provided"));
     }
 
     return this.http
-      .post<any>(issuerCredentialUrl, payload, {
+      .post<CredentialResponse>(issuerCredentialUrl, payload, {
         responseType: "json",
         headers: { Authorization: `Bearer ${bearerToken}` },
       })
@@ -125,18 +136,11 @@ export class ApiService {
   public getCredentialV2(
     issuerCredentialUrl: string,
     bearerToken: string,
-    payload: any
-  ): any {
+    payload: CredentialResponse
+  ): Observable<CredentialResponse> {
     if (!issuerCredentialUrl) {
-      return "No issuer_credential_url provided";
+      return throwError(() => new Error("No issuer_credential_url provided"));
     }
-
-    console.log(
-      "getCredentialV2 payload",
-      issuerCredentialUrl,
-      bearerToken,
-      payload
-    );
 
     const headers = new HttpHeaders({
       Authorization: `Bearer ${bearerToken}`,
@@ -144,19 +148,19 @@ export class ApiService {
     });
 
     return this.http
-      .post<any>(issuerCredentialUrl, payload, {
+      .post<CredentialResponse>(issuerCredentialUrl, payload, {
         responseType: "json",
         headers: headers,
       })
       .pipe(catchError(this.handleError));
   }
 
-  public getRegistryEntry(registryEntryUrl: string): Observable<any[]> {
+  public getRegistryEntry(registryEntryUrl: string): Observable<RegistryEntry[]> {
     const url = this.getRegistryEntryLocation(registryEntryUrl);
-    return this.http.get<any>(url).pipe(catchError(this.handleError));
+    return this.http.get<RegistryEntry[]>(url).pipe(catchError(this.handleError));
   }
 
-  private handleError(error: HttpErrorResponse) {
+  private handleError(error: HttpErrorResponse): Observable<never> {
     console.error(error);
     return throwError(() => new Error("An error occurred while fetching data"));
   }
@@ -172,8 +176,8 @@ export class ApiService {
   public submitVerificationResponse(
     responseDataUri: string,
     vpToken: string,
-    presentationSubmission: any
-  ): Observable<any> {
+    presentationSubmission: PresentationSubmission
+  ): Observable<string> {
     if (!responseDataUri) {
       return throwError(() => new Error("No response_uri provided"));
     }
@@ -190,10 +194,10 @@ export class ApiService {
     return this.http
       .post(responseDataUri, body.toString(), {
         headers: headers,
-        responseType: "text" as any
+        responseType: "text"
       })
       .pipe(
-        catchError((error) => {
+        catchError((error: HttpErrorResponse) => {
           console.error("Error submitting verification response:", error);
           return throwError(() => new Error("Failed to submit verification response"));
         })
@@ -203,13 +207,13 @@ export class ApiService {
   public submitVerificationResponseDcql(
     responseDataUri: string,
     vpToken: string,
-    credentialId: string = "credential_1"
-  ): Observable<any> {
+    credentialId = "credential_1"
+  ): Observable<string> {
     if (!responseDataUri) {
       return throwError(() => new Error("No response_uri provided"));
     }
 
-    const vpTokenMap: { [key: string]: string[] } = {};
+    const vpTokenMap: VpTokenMap = {};
     vpTokenMap[credentialId] = [vpToken];
     const vpTokenJson = JSON.stringify(vpTokenMap);
 
@@ -224,10 +228,10 @@ export class ApiService {
     return this.http
       .post(responseDataUri, body.toString(), {
         headers: headers,
-        responseType: "text" as any
+        responseType: "text"
       })
       .pipe(
-        catchError((error) => {
+        catchError((error: HttpErrorResponse) => {
           console.error("DCQL submission failed:", error);
           return throwError(() => new Error("Failed to submit DCQL verification response"));
         })

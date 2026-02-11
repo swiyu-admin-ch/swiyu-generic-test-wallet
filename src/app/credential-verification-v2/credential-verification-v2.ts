@@ -1,4 +1,4 @@
-import { Component, signal, WritableSignal } from "@angular/core";
+import { Component, inject, signal, WritableSignal } from "@angular/core";
 import { SignJWT } from "jose";
 import { ApiService } from "../api-service";
 import { FormsModule } from "@angular/forms";
@@ -10,12 +10,13 @@ import { MatAccordion } from "@angular/material/expansion";
 import { JsonPipe, SlicePipe, CommonModule } from "@angular/common";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
-import { CredentialService } from "@services/credential.service";
 import { DeeplinkInput } from "../deeplink-input/deeplink-input";
 import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { VerificationService } from "@services/verification.service";
 import { HolderKeyService } from "@services/holder-key.service";
 import { Router } from "@angular/router";
+import { DcqlClaimDto, DcqlCredentialDto, DcqlQueryDto, RequestObject } from "src/generated/verifier";
+import { JwtPayload } from "@app/models/api-response";
 
 @Component({
   selector: "app-credential-verification-v2",
@@ -39,33 +40,38 @@ import { Router } from "@angular/router";
   standalone: true,
 })
 export class CredentialVerificationV2 {
+  private apiService = inject(ApiService);
+  private verificationService = inject(VerificationService);
+  private holderKeyService = inject(HolderKeyService);
+  private router = inject(Router);
+
   readonly panelOpenState = signal(false);
   public input =
     "swiyu-verify://?client_id=did%3Atdw%3AQmcsWxATnPMAcbjukjXAkVAUAKRSC71mjMWjod4NVWrZ9Y%3Amockserver%253A1080%3Aapi%3Av2%3Adid%3A64f74058-4fa3-4609-a7b4-dd6a8853bc32&request_uri=http%3A%2F%2Fdefault-verifier-url.admin.ch%2Foid4vp%2Fapi%2Frequest-object%2F9eafca2d-9bae-46a2-a81d-f3576809d2c0";
 
-  deeplink: WritableSignal<undefined | any> = signal(undefined);
-  requestObject: WritableSignal<undefined | any> = signal(undefined);
-  dcqlQuery: WritableSignal<undefined | any> = signal(undefined);
-  requiredCredentials: WritableSignal<undefined | any[]> = signal(undefined);
+  deeplink: WritableSignal<Record<string, string> | undefined> = signal(undefined);
+  requestObject: WritableSignal<RequestObject | undefined> = signal(undefined);
+  dcqlQuery: WritableSignal<DcqlQueryDto | undefined> = signal(undefined);
+  requiredCredentials: WritableSignal<DcqlCredentialDto[] | undefined> = signal(undefined);
   credentialInput: WritableSignal<string> = signal("");
-  vpToken: WritableSignal<undefined | string> = signal(undefined);
-  responseSubmitted: WritableSignal<boolean> = signal(false);
+  vpToken: WritableSignal<string | undefined> = signal(undefined);
+  responseSubmitted: WritableSignal<boolean | undefined> = signal(undefined);
 
   credentialValid: WritableSignal<boolean> = signal(false);
   credentialValidationError: WritableSignal<string | undefined> = signal(undefined);
-  decodedHeader: WritableSignal<any> = signal(undefined);
-  decodedPayload: WritableSignal<any> = signal(undefined);
+  decodedHeader: WritableSignal<JwtPayload | undefined> = signal(undefined);
+  decodedPayload: WritableSignal<JwtPayload | undefined> = signal(undefined);
 
   constructor(
-    private apiService: ApiService,
-    private verificationService: VerificationService,
-    private holderKeyService: HolderKeyService,
-    private router: Router
   ) {
     const navigation = this.router.getCurrentNavigation();
     if (navigation?.extras?.state?.credential) {
       this.credentialInput.set(navigation.extras.state.credential);
     }
+  }
+
+  public onClear(): void {
+    this.reset();
   }
 
   public onResolve(input: string): void {
@@ -76,20 +82,21 @@ export class CredentialVerificationV2 {
       return;
     }
 
-    let decodedDeeplink: any =
-      this.verificationService.decodeDeeplink(input);
+    const decodedDeeplink: Record<string, string> =
+      this.verificationService.decodeDeeplink(input) as Record<string, string>;
     this.deeplink.set(decodedDeeplink);
 
 
     this.apiService
       .resolveRequestObjectFromDeeplink(decodedDeeplink?.request_uri)
       .pipe(
-        switchMap((requestObject: any) => {
-          this.requestObject.set(requestObject);
-          this.dcqlQuery.set(requestObject?.dcql_query);
+        switchMap((requestObject: JwtPayload) => {
+          const reqObj = requestObject as unknown as RequestObject;
+          this.requestObject.set(reqObj);
+          this.dcqlQuery.set(reqObj?.dcql_query);
 
           const requiredCredentials = this.verificationService.extractCredentialsFromDCQL(
-            requestObject?.dcql_query
+            reqObj?.dcql_query
           );
           this.requiredCredentials.set(requiredCredentials);
 
@@ -99,7 +106,7 @@ export class CredentialVerificationV2 {
             return of(null);
           }
 
-          const requiredFields = this.extractFieldPathsFromDCQL(requestObject?.dcql_query);
+          const requiredFields = this.extractClaimsFromDcqlQuery(reqObj?.dcql_query);
           const payloadJson = this.extractPayloadFromSdJwt(credentialString);
           const validationErrors = this.validateRequiredFields(requiredFields, payloadJson);
 
@@ -108,24 +115,25 @@ export class CredentialVerificationV2 {
             return of(null);
           }
 
-          const clientId = requestObject?.client_id;
+          const clientId = reqObj?.client_id as string;
 
           return from(this.createAndSignPresentation(
             credentialString,
             clientId,
-            requestObject?.nonce
+            reqObj?.nonce as string
           ));
         }),
-        switchMap((vpToken: any) => {
+        switchMap((vpToken: string | null) => {
           if (!vpToken) {
             return of(null);
           }
           this.vpToken.set(vpToken);
           const dcqlCredentials = this.dcqlQuery()?.credentials || [];
-          const credentialId = dcqlCredentials[0]?.id || "credential_1";
+          const firstCredential = dcqlCredentials[0];
+          const credentialId = (firstCredential?.id as string) || "credential_1";
 
           return this.apiService.submitVerificationResponseDcql(
-            this.requestObject()?.response_uri,
+            this.requestObject()?.response_uri as string,
             vpToken,
             credentialId
           );
@@ -135,7 +143,8 @@ export class CredentialVerificationV2 {
         next: () => {
           this.responseSubmitted.set(true);
         },
-        error: (error) => {
+        error: (error: Error) => {
+          this.responseSubmitted.set(false);
           console.error("Error during verification process:", error);
         }
       });
@@ -147,7 +156,7 @@ export class CredentialVerificationV2 {
     this.dcqlQuery.set(undefined);
     this.requiredCredentials.set(undefined);
     this.vpToken.set(undefined);
-    this.responseSubmitted.set(false);
+    this.responseSubmitted.set(undefined);
     this.credentialValid.set(false);
     this.credentialValidationError.set(undefined);
     this.decodedHeader.set(undefined);
@@ -221,9 +230,7 @@ export class CredentialVerificationV2 {
   ): Promise<string> {
     const originalSdJwt = credentialString;
 
-    const requiredFields = this.extractFieldPathsFromDCQL(this.dcqlQuery());
-
-
+    const requiredFields = this.extractClaimsFromDcqlQuery(this.dcqlQuery());
 
     const selectiveDisclosureSdJwt = await this.createSelectiveDisclosureSdJwt(
       originalSdJwt,
@@ -232,7 +239,7 @@ export class CredentialVerificationV2 {
 
     const sdHash = await this.calculateSdHash(selectiveDisclosureSdJwt);
 
-    const kbJwtPayload = {
+    const kbJwtPayload: Record<string, unknown> = {
       sd_hash: sdHash,
       aud: [verifierId],
       nonce: nonce,
@@ -253,36 +260,36 @@ export class CredentialVerificationV2 {
     return vpToken;
   }
 
-  private extractFieldPathsFromDCQL(dcqlQuery: any): string[] {
-    const DISCLOSURE_EXCLUDED = new Set(['iss', 'nbf', 'exp', 'cnf', 'status']);
-    const fieldPaths: string[] = [];
+  public extractClaimsFromDcqlQuery(
+    dcqlQuery: DcqlQueryDto | undefined
+  ): DcqlClaimDto[] {
 
     if (!dcqlQuery?.credentials) {
-      return fieldPaths;
+      return [];
     }
 
-    dcqlQuery.credentials.forEach((credential: any) => {
-      credential.claims?.forEach((claim: any) => {
-        if (claim.path && Array.isArray(claim.path)) {
-          claim.path.forEach((pathElement: any) => {
-            if (typeof pathElement === 'string') {
-              const claimName = pathElement.replace(/^\$\./, '');
-              if (!DISCLOSURE_EXCLUDED.has(claimName)) {
-                if (!fieldPaths.includes(claimName)) {
-                  fieldPaths.push(claimName);
-                }
-              }
-            }
-          });
+    const extractedClaims: DcqlClaimDto[] = [];
+    const seenPaths = new Set<string>();
+
+    dcqlQuery.credentials.forEach((credential: DcqlCredentialDto) => {
+      const claims = credential.claims ?? [];
+
+      claims.forEach((claim: DcqlClaimDto) => {
+        if (!Array.isArray(claim.path)) {
+          return;
+        }
+
+        const pathKey = claim.path.join('|');
+
+        if (!seenPaths.has(pathKey)) {
+          seenPaths.add(pathKey);
+          extractedClaims.push(claim);
         }
       });
     });
 
-    console.log("DCQL – Extracted required fields:", fieldPaths);
-    return fieldPaths;
+    return extractedClaims;
   }
-
-
 
   private async calculateSdHash(sdJwtPresentation: string): Promise<string> {
     const encoder = new TextEncoder();
@@ -291,7 +298,7 @@ export class CredentialVerificationV2 {
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
 
-    const hashBase64Standard = btoa(String.fromCharCode.apply(null, hashArray as any));
+    const hashBase64Standard = btoa(String.fromCharCode.apply(null, hashArray as unknown as number[]));
 
     const hashBase64Url = hashBase64Standard
       .replace(/\+/g, '-')
@@ -303,9 +310,17 @@ export class CredentialVerificationV2 {
 
   private async createSelectiveDisclosureSdJwt(
     fullSdJwt: string,
-    requiredFields: string[]
+    requiredFields: DcqlClaimDto[]
   ): Promise<string> {
+
     const DISCLOSURE_EXCLUDED = new Set(['iss', 'nbf', 'exp', 'cnf', 'status']);
+
+    const requiredClaimNames = new Set(
+      requiredFields
+        .map(c => c.path)
+        .reduce((acc, p) => acc.concat(p ?? []), [])
+        .filter((p): p is string => typeof p === 'string')
+    );
 
     const parts = fullSdJwt.split('~');
     const jwtPart = parts[0];
@@ -313,32 +328,30 @@ export class CredentialVerificationV2 {
 
     const selectedDisclosures: string[] = [];
     const foundClaims: string[] = [];
-    const disclosureDetails: any[] = [];
+    const disclosureDetails: Record<string, unknown>[] = [];
 
     disclosureParts.forEach((disclosure: string, index: number) => {
       try {
         if (!disclosure) return;
 
         const decodedDisclosure = JSON.parse(
-          new TextDecoder().decode(
-            this.base64UrlDecode(disclosure)
-          )
-        );
+          new TextDecoder().decode(this.base64UrlDecode(disclosure))
+        ) as (string | unknown)[];
 
         if (Array.isArray(decodedDisclosure) && decodedDisclosure.length >= 2) {
-          const claimName = decodedDisclosure[1];
+          const claimName = decodedDisclosure[1] as string;
 
           if (DISCLOSURE_EXCLUDED.has(claimName)) {
             return;
           }
 
-          if (requiredFields.includes(claimName)) {
+          if (requiredClaimNames.has(claimName)) {
             selectedDisclosures.push(disclosure);
             foundClaims.push(claimName);
             disclosureDetails.push({
               claimName,
               value: decodedDisclosure[2],
-              encoded: disclosure.substring(0, 30) + "..."
+              encoded: disclosure.substring(0, 30) + '...'
             });
           }
         }
@@ -354,48 +367,53 @@ export class CredentialVerificationV2 {
       presentation += '~';
     }
 
-    console.log("Final presentation format: JWT~disc1~disc2~...~");
     return presentation;
   }
 
-
-
-  private extractPayloadFromSdJwt(sdJwt: string): any {
+  private extractPayloadFromSdJwt(sdJwt: string): Record<string, unknown> {
     try {
       const parts = sdJwt.split('~');
       const jwtPart = parts[0];
       const [, payloadB64] = jwtPart.split('.');
       return JSON.parse(
         new TextDecoder().decode(this.base64UrlDecode(payloadB64))
-      );
+      ) as Record<string, unknown>;
     } catch (error) {
       console.error("Failed to extract payload from SD-JWT:", error);
       return {};
     }
   }
 
-  private validateRequiredFields(requiredFields: string[], payloadJson: any): string[] {
+  private validateRequiredFields(requiredFields: DcqlClaimDto[], payloadJson: Record<string, unknown>): string[] {
     const RESERVED_CLAIMS = new Set(['iss', 'nbf', 'exp', 'cnf', 'vct', 'status']);
-    const missingFields: string[] = [];
 
-    requiredFields.forEach((field) => {
-      if (RESERVED_CLAIMS.has(field)) {
-        return;
+    const requiredClaimNames = requiredFields
+      .flatMap(claim => Array.isArray(claim.path) ? claim.path : [])
+      .filter((p): p is string => typeof p === 'string')
+      .filter(p => !RESERVED_CLAIMS.has(p));
+
+
+    const missingFields = requiredClaimNames.filter((claimName) => {
+
+      // présent en clair
+      if (claimName in payloadJson) {
+        return false;
       }
 
-      if (field in payloadJson) {
-        return;
+      // présent en selective disclosure (_sd)
+      if (
+        payloadJson._sd &&
+        Array.isArray(payloadJson._sd) &&
+        payloadJson._sd.length > 0
+      ) {
+        return false;
       }
 
-      if (payloadJson._sd && Array.isArray(payloadJson._sd) && payloadJson._sd.length > 0) {
-        return;
-      }
-
-      missingFields.push(field);
+      return true;
     });
 
     if (missingFields.length > 0) {
-      console.warn("Missing required fields:", missingFields);
+      console.warn('Missing required fields:', missingFields);
     }
 
     return missingFields;

@@ -16,6 +16,12 @@ Install dependencies
 npm i
 ```
 
+Generate some classes based on the issuer and verifier components
+
+```bash
+npm run generate:apis
+```
+
 Start application
 
 ```bash
