@@ -4,23 +4,26 @@
     "outDir": "./out-tsc",
     "sourceMap": true,
     "declaration": false,
+    "esModuleInterop": true,
     "module": "es2020",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "target": "ES2022",
     "typeRoots": [
       "node_modules/@types"
     ],
-    "lib": [
-      "es2020",
-      "dom"
-    ],
     "baseUrl": "./",
     "paths": {
-      "@app/*": ["src/app/*"],
-      "@services/*": ["src/app/services/*"],
-      "@modules/*": ["src/app/modules/*"]
+      "@app/*": [
+        "src/app/*"
+      ],
+      "@services/*": [
+        "src/app/services/*"
+      ],
+      "@modules/*": [
+        "src/app/modules/*"
+      ]
     }
   },
   "exclude": [
