@@ -10,10 +10,9 @@ import { ChecklistEntry } from "../checklist-entry/checklist-entry";
 import { MatList } from "@angular/material/list";
 import { MatAccordion } from "@angular/material/expansion";
 import { JsonPipe } from "@angular/common";
-import { MatFormField, MatFormFieldModule } from "@angular/material/form-field";
+import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
 import { CredentialService } from "@services/credential.service";
-import { MatButton } from "@angular/material/button";
 import { DeeplinkInput } from "../deeplink-input/deeplink-input";
 import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { HolderKeyService } from "@services/holder-key.service";
@@ -29,11 +28,9 @@ import { JwtPayload, OpenIdMetadataResponse, CredentialResponse, RegistryEntry }
     MatList,
     MatAccordion,
     JsonPipe,
-    MatFormField,
     MatFormFieldModule,
     MatInputModule,
     FormsModule,
-    MatButton,
     DeeplinkInput,
     MatCard,
     MatCardTitle,

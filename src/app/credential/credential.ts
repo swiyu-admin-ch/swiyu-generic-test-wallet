@@ -10,20 +10,8 @@ import { MatFormField } from "@angular/material/form-field";
 import { MatInput } from "@angular/material/input";
 import { FormsModule } from "@angular/forms";
 import { CommonModule } from "@angular/common";
-import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import * as jose from "jose";
-import { MatAccordion } from "@angular/material/expansion";
-import { PanelComponent } from "../deeplink-resolver/panel.component";
-import { ChecklistEntry } from "../checklist-entry/checklist-entry";
-import { MatList } from "@angular/material/list";
-import {
-  MatGridList,
-  MatGridTile,
-  MatGridTileHeaderCssMatStyler,
-} from "@angular/material/grid-list";
-import { DeeplinkInput } from "../deeplink-input/deeplink-input";
 import { MatButton } from "@angular/material/button";
-import { MatIcon } from "@angular/material/icon";
 import { Router } from "@angular/router";
 import { JwtPayload, RegistryEntry } from "@app/models/api-response";
 import { ToastService } from "@app/services/toast.service";
@@ -36,19 +24,7 @@ import { ToastService } from "@app/services/toast.service";
     MatInput,
     CommonModule,
     FormsModule,
-    MatCard,
-    MatCardContent,
-    MatCardTitle,
-    MatAccordion,
-    PanelComponent,
-    ChecklistEntry,
-    MatList,
-    MatGridList,
-    MatGridTile,
-    MatGridTileHeaderCssMatStyler,
-    DeeplinkInput,
     MatButton,
-    MatIcon,
   ],
   templateUrl: "./credential.html",
   styleUrl: "./credential.css",
