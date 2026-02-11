@@ -7,7 +7,7 @@ import { PanelComponent } from "../deeplink-resolver/panel.component";
 import { ChecklistEntry } from "../checklist-entry/checklist-entry";
 import { MatList } from "@angular/material/list";
 import { MatAccordion } from "@angular/material/expansion";
-import { JsonPipe, SlicePipe, CommonModule } from "@angular/common";
+import { JsonPipe, CommonModule } from "@angular/common";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
 import { DeeplinkInput } from "../deeplink-input/deeplink-input";
@@ -26,7 +26,6 @@ import { JwtPayload } from "@app/models/api-response";
     MatList,
     MatAccordion,
     JsonPipe,
-    SlicePipe,
     CommonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -62,6 +61,8 @@ export class CredentialVerificationV2 {
   decodedHeader: WritableSignal<JwtPayload | undefined> = signal(undefined);
   decodedPayload: WritableSignal<JwtPayload | undefined> = signal(undefined);
 
+  encryptionRequired: WritableSignal<boolean | undefined> = signal(undefined);
+
   constructor(
   ) {
     const navigation = this.router.getCurrentNavigation();
@@ -86,7 +87,6 @@ export class CredentialVerificationV2 {
       this.verificationService.decodeDeeplink(input) as Record<string, string>;
     this.deeplink.set(decodedDeeplink);
 
-
     this.apiService
       .resolveRequestObjectFromDeeplink(decodedDeeplink?.request_uri)
       .pipe(
@@ -94,6 +94,7 @@ export class CredentialVerificationV2 {
           const reqObj = requestObject as unknown as RequestObject;
           this.requestObject.set(reqObj);
           this.dcqlQuery.set(reqObj?.dcql_query);
+          this.encryptionRequired.set(requestObject?.response_mode === 'direct_post.jwt');
 
           const requiredCredentials = this.verificationService.extractCredentialsFromDCQL(
             reqObj?.dcql_query
@@ -101,8 +102,10 @@ export class CredentialVerificationV2 {
           this.requiredCredentials.set(requiredCredentials);
 
           const credentialString = this.credentialInput();
-          if (!credentialString || credentialString.trim() === "") {
-            console.error("No credential provided");
+          if (!credentialString?.trim()) {
+            const error = "No credential provided";
+            console.error(error);
+            this.credentialValidationError.set(error);
             return of(null);
           }
 
@@ -111,41 +114,45 @@ export class CredentialVerificationV2 {
           const validationErrors = this.validateRequiredFields(requiredFields, payloadJson);
 
           if (validationErrors.length > 0) {
-            this.credentialValidationError.set(`Missing required fields: ${validationErrors.join(', ')}`);
+            const errorMsg = `Missing required fields: ${validationErrors.join(', ')}`;
+            console.error(errorMsg);
+            this.credentialValidationError.set(errorMsg);
             return of(null);
           }
 
           const clientId = reqObj?.client_id as string;
-
           return from(this.createAndSignPresentation(
             credentialString,
             clientId,
             reqObj?.nonce as string
           ));
         }),
+
         switchMap((vpToken: string | null) => {
           if (!vpToken) {
             return of(null);
           }
+
           this.vpToken.set(vpToken);
           const dcqlCredentials = this.dcqlQuery()?.credentials || [];
-          const firstCredential = dcqlCredentials[0];
-          const credentialId = (firstCredential?.id as string) || "credential_1";
+          const credentialId = (dcqlCredentials[0]?.id as string) || "credential_1";
 
           return this.apiService.submitVerificationResponseDcql(
-            this.requestObject()?.response_uri as string,
+            this.requestObject()!,
             vpToken,
             credentialId
           );
         })
       )
       .subscribe({
-        next: () => {
+        next: (response) => {
+          console.debug("Verification response submitted successfully", response);
           this.responseSubmitted.set(true);
         },
         error: (error: Error) => {
+          console.error("Verification process failed:", error.message);
           this.responseSubmitted.set(false);
-          console.error("Error during verification process:", error);
+          this.credentialValidationError.set(error.message);
         }
       });
   }
@@ -255,9 +262,7 @@ export class CredentialVerificationV2 {
       .setIssuedAt(new Date())
       .sign(this.holderKeyService.getPrivateKey());
 
-    const vpToken = `${selectiveDisclosureSdJwt}${kbJwt}`;
-
-    return vpToken;
+    return `${selectiveDisclosureSdJwt}${kbJwt}`;
   }
 
   public extractClaimsFromDcqlQuery(
@@ -300,12 +305,10 @@ export class CredentialVerificationV2 {
 
     const hashBase64Standard = btoa(String.fromCharCode.apply(null, hashArray as unknown as number[]));
 
-    const hashBase64Url = hashBase64Standard
+    return hashBase64Standard
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
       .replace(/=/g, '');
-
-    return hashBase64Url;
   }
 
   private async createSelectiveDisclosureSdJwt(
@@ -327,8 +330,6 @@ export class CredentialVerificationV2 {
     const disclosureParts = parts.slice(1, -1);
 
     const selectedDisclosures: string[] = [];
-    const foundClaims: string[] = [];
-    const disclosureDetails: Record<string, unknown>[] = [];
 
     disclosureParts.forEach((disclosure: string, index: number) => {
       try {
@@ -347,12 +348,6 @@ export class CredentialVerificationV2 {
 
           if (requiredClaimNames.has(claimName)) {
             selectedDisclosures.push(disclosure);
-            foundClaims.push(claimName);
-            disclosureDetails.push({
-              claimName,
-              value: decodedDisclosure[2],
-              encoded: disclosure.substring(0, 30) + '...'
-            });
           }
         }
       } catch (e) {
@@ -394,22 +389,11 @@ export class CredentialVerificationV2 {
 
 
     const missingFields = requiredClaimNames.filter((claimName) => {
-
-      // présent en clair
       if (claimName in payloadJson) {
         return false;
       }
 
-      // présent en selective disclosure (_sd)
-      if (
-        payloadJson._sd &&
-        Array.isArray(payloadJson._sd) &&
-        payloadJson._sd.length > 0
-      ) {
-        return false;
-      }
-
-      return true;
+      return !(payloadJson._sd && Array.isArray(payloadJson._sd) && payloadJson._sd.length > 0);
     });
 
     if (missingFields.length > 0) {

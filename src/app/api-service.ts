@@ -5,8 +5,9 @@ import {
   HttpHeaders,
   HttpParams,
 } from "@angular/common/http";
-import { catchError, Observable, throwError, map } from "rxjs";
-import { NonceResponse, OAuthToken } from "src/generated/issuer";
+import { catchError, Observable, throwError, map, switchMap, from, of } from "rxjs";
+import { CompactEncrypt, importJWK, compactDecrypt, CompactJWEHeaderParameters, generateKeyPair, GenerateKeyPairOptions } from "jose";
+import { IssuerCredentialRequestEncryption, IssuerCredentialResponseEncryption, NonceResponse, OAuthToken } from "src/generated/issuer";
 import {
   OpenIdMetadataResponse,
   OpenIdConfigResponse,
@@ -16,12 +17,14 @@ import {
   VpTokenMap,
   RegistryEntry
 } from "@app/models/api-response";
+import { RequestObject } from "src/generated/verifier";
 
 @Injectable({
   providedIn: "root",
 })
 export class ApiService {
   private http = inject(HttpClient)
+  private ephemeralPrivateKey?: CryptoKey;
 
   public resolveOpenIdMetadataFromDeeplink(
     issuerCredentialUrl: string
@@ -133,26 +136,151 @@ export class ApiService {
       .pipe(catchError(this.handleError));
   }
 
+  public async generatePayloadEncryptionKey(alg: string, options?: GenerateKeyPairOptions): Promise<void> {
+    const { privateKey } = await generateKeyPair(alg, options);
+    this.ephemeralPrivateKey = privateKey;
+  }
+
+
   public getCredentialV2(
-    issuerCredentialUrl: string,
+    metadata: OpenIdMetadataResponse,
     bearerToken: string,
     payload: CredentialResponse
   ): Observable<CredentialResponse> {
+    const issuerCredentialUrl = metadata.credential_endpoint as string;
+
     if (!issuerCredentialUrl) {
       return throwError(() => new Error("No issuer_credential_url provided"));
     }
 
-    const headers = new HttpHeaders({
-      Authorization: `Bearer ${bearerToken}`,
-      "SWIYU-API-Version": "2",
-    });
+    const requestEncryption = metadata.credential_request_encryption as IssuerCredentialRequestEncryption;
+    const responseEncryption = metadata.credential_response_encryption as IssuerCredentialResponseEncryption;
+    const isEncrypted = requestEncryption?.encryption_required === true;
 
-    return this.http
-      .post<CredentialResponse>(issuerCredentialUrl, payload, {
-        responseType: "json",
-        headers: headers,
+    return from(
+      this.prepareCredentialRequest(payload, requestEncryption)
+    ).pipe(
+      switchMap((preparedPayload) => {
+        let headers = new HttpHeaders({
+          Authorization: `Bearer ${bearerToken}`,
+          "SWIYU-API-Version": "2",
+        });
+
+        if (isEncrypted) {
+          headers = headers.set("Content-Type", "application/jwt");
+          return this.http.post(issuerCredentialUrl, preparedPayload, {
+            responseType: "text" as const,
+            headers: headers,
+          });
+        } else {
+          headers = headers.set("Content-Type", "application/json");
+          return this.http.post<CredentialResponse>(issuerCredentialUrl, preparedPayload, {
+            responseType: "json" as const,
+            headers: headers,
+          });
+        }
+      }),
+      switchMap((response: CredentialResponse | string) => {
+        return from(
+          this.processCredentialResponse(
+            response,
+            responseEncryption,
+            isEncrypted
+          )
+        );
+      }),
+      catchError((error: HttpErrorResponse | Error) => {
+        const errorMsg = error instanceof HttpErrorResponse
+          ? `Credential fetch failed (HTTP ${error.status}): ${error.message}`
+          : `Credential fetch failed: ${error.message}`;
+        console.error(errorMsg);
+        return throwError(() => new Error(errorMsg));
       })
-      .pipe(catchError(this.handleError));
+    );
+  }
+
+  private async prepareCredentialRequest(
+    payload: CredentialResponse,
+    requestEncryption?: IssuerCredentialRequestEncryption
+  ): Promise<CredentialResponse | string> {
+    if (!requestEncryption || !requestEncryption.encryption_required) {
+      return payload;
+    }
+
+    try {
+      if (!requestEncryption.jwks && !requestEncryption.jwks["keys"]) {
+        throw new Error("No JWKS provided in credential_request_encryption");
+      }
+
+      const keys = requestEncryption.jwks["keys"];
+
+      if (!keys || keys.length === 0) {
+        throw new Error("No encryption keys available in credential_request_encryption.jwks.keys");
+      }
+
+      const encKey = keys[0] as Record<string, string>;
+      const encAlg = encKey.alg || "ECDH-ES";
+      const encEnc = requestEncryption.enc_values_supported[0]
+      encKey.enc = encEnc
+      const zipSupported = requestEncryption.zip_values_supported[0];
+
+      const recipientPublicKey = await importJWK(encKey, encAlg);
+
+      this.generatePayloadEncryptionKey(encAlg, { crv: encKey.crv });
+
+      const plaintext = new TextEncoder().encode(JSON.stringify(payload));
+
+      const protectedHeader: CompactJWEHeaderParameters = {
+        alg: encAlg,
+        enc: encEnc,
+        zip: zipSupported,
+        typ: "JWT",
+        kid: encKey.kid
+      };
+
+      const encryptedJwe = await new CompactEncrypt(plaintext)
+        .setProtectedHeader(protectedHeader)
+        .encrypt(recipientPublicKey);
+
+      return encryptedJwe;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown encryption error";
+      console.error("Credential request encryption failed:", error);
+      throw new Error(`Failed to encrypt credential request: ${errorMessage}`);
+    }
+  }
+
+  private async processCredentialResponse(
+    response: CredentialResponse | string,
+    responseEncryption?: IssuerCredentialResponseEncryption,
+    isEncrypted = false
+  ): Promise<CredentialResponse> {
+    if (!isEncrypted || !responseEncryption?.encryption_required) {
+      return response as CredentialResponse;
+    }
+
+    try {
+      const credentialResponseJwe = response as string;
+
+      if (!this.ephemeralPrivateKey) {
+        throw new Error("Missing wallet ephemeral private key. Cannot decrypt credential response.");
+      }
+
+      const { plaintext, protectedHeader } = await compactDecrypt(
+        credentialResponseJwe,
+        this.ephemeralPrivateKey
+      );
+
+      const decryptedPayload = JSON.parse(new TextDecoder().decode(plaintext)) as CredentialResponse;
+
+      console.debug("Credential response decrypted successfully", protectedHeader);
+      return decryptedPayload;
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown decryption error";
+      console.error("Credential response decryption failed:", error);
+      throw new Error(`Failed to decrypt credential response: ${errorMessage}`);
+    }
   }
 
   public getRegistryEntry(registryEntryUrl: string): Observable<RegistryEntry[]> {
@@ -204,37 +332,146 @@ export class ApiService {
       );
   }
 
+  private prepareDcqlPayload(
+    requestObject: RequestObject,
+    vpTokenJson: string
+  ): Observable<{ body: HttpParams; headers: HttpHeaders }> {
+    const headers = new HttpHeaders({
+      "Content-Type": "application/x-www-form-urlencoded",
+      "SWIYU-API-Version": "2",
+    });
+
+    if (requestObject.response_mode === "direct_post.jwt") {
+      return from(this.encryptVerifierPayload(requestObject, vpTokenJson)).pipe(
+        map((encryptedPayload: string) => {
+          const body = new HttpParams().set("response", encryptedPayload);
+          return { body, headers };
+        }),
+        catchError((error: Error) =>
+          throwError(() => new Error(`JWE encryption failed: ${error.message}`))
+        )
+      );
+    }
+
+    const body = new HttpParams().set("vp_token", vpTokenJson);
+    return of({ body, headers });
+  }
+
   public submitVerificationResponseDcql(
-    responseDataUri: string,
+    requestObject: RequestObject,
     vpToken: string,
     credentialId = "credential_1"
   ): Observable<string> {
-    if (!responseDataUri) {
-      return throwError(() => new Error("No response_uri provided"));
+    if (!requestObject?.response_uri) {
+      return throwError(() => new Error("No response_uri provided in request_object"));
+    }
+
+    if (!vpToken?.trim()) {
+      return throwError(() => new Error("VP token is empty or undefined"));
     }
 
     const vpTokenMap: VpTokenMap = {};
     vpTokenMap[credentialId] = [vpToken];
     const vpTokenJson = JSON.stringify(vpTokenMap);
 
-    const body = new HttpParams()
-      .set("vp_token", vpTokenJson);
+    return this.prepareDcqlPayload(requestObject, vpTokenJson).pipe(
+      switchMap(({ body, headers }) => {
+        console.debug("Submitting DCQL verification response", {
+          endpoint: requestObject.response_uri,
+          responseMode: requestObject.response_mode,
+          credentialId,
+        });
 
-    const headers = new HttpHeaders({
-      "Content-Type": "application/x-www-form-urlencoded",
-      "SWIYU-API-Version": "2"
-    });
+        return this.http.post(requestObject.response_uri!, body.toString(), {
+          headers,
+          responseType: "text",
+        });
+      }),
 
-    return this.http
-      .post(responseDataUri, body.toString(), {
-        headers: headers,
-        responseType: "text"
+      catchError((error: HttpErrorResponse | Error) => {
+        let errorMsg: string;
+
+        if (error instanceof HttpErrorResponse) {
+          errorMsg = `DCQL submission failed (HTTP ${error.status}): ${error.message}`;
+          if (error.error) {
+            errorMsg += ` - Server response: ${error.error}`;
+          }
+        } else {
+          errorMsg = `DCQL submission failed: ${error.message}`;
+        }
+
+        console.error(errorMsg, { error, requestObject });
+        return throwError(() => new Error(errorMsg));
       })
-      .pipe(
-        catchError((error: HttpErrorResponse) => {
-          console.error("DCQL submission failed:", error);
-          return throwError(() => new Error("Failed to submit DCQL verification response"));
+    );
+  }
+
+  public async encryptVerifierPayload(
+    requestObject: RequestObject,
+    vpTokenJson: string
+  ): Promise<string> {
+    try {
+      if (!requestObject?.client_metadata?.jwks?.keys?.length) {
+        throw new Error(
+          "No encryption key available in client_metadata.jwks.keys"
+        );
+      }
+
+      const encryptionKey = requestObject.client_metadata.jwks.keys[0];
+
+      if (!encryptionKey.alg || !encryptionKey.kty) {
+        throw new Error("Invalid JWK: missing alg or kty properties");
+      }
+
+      if (!requestObject.client_metadata.encrypted_response_enc_values_supported?.length) {
+        throw new Error("No encryption algorithm specified in encrypted_response_enc_values_supported");
+      }
+
+      const encryptionAlg = encryptionKey.alg;
+      const encryptionEnc = requestObject.client_metadata.encrypted_response_enc_values_supported[0]; // Ex: A128GCM
+
+      const publicKey = await importJWK(encryptionKey, encryptionAlg);
+
+      let vpTokenObj: Record<string, unknown>;
+      try {
+        vpTokenObj = JSON.parse(vpTokenJson);
+      } catch (e) {
+        throw new Error(`Invalid vp_token JSON format: ${(e as Error).message}`);
+      }
+
+      const payloadToEncrypt = {
+        vp_token: vpTokenObj
+      };
+      const payloadBytes = new TextEncoder().encode(JSON.stringify(payloadToEncrypt));
+
+      const encryptedJwe = await new CompactEncrypt(payloadBytes)
+        .setProtectedHeader({
+          alg: encryptionAlg,
+          enc: encryptionEnc,
+          typ: "JWT",
+          kid: encryptionKey.kid || undefined,
         })
-      );
+        .encrypt(publicKey);
+
+      console.debug("VP token encrypted successfully", {
+        algorithm: encryptionAlg,
+        encryptionMethod: encryptionEnc,
+        keyId: encryptionKey.kid
+      });
+
+      return encryptedJwe;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Unknown encryption error";
+      console.error("Encryption failed:", {
+        error,
+        hasClientMetadata: !!requestObject?.client_metadata,
+        hasKeys: !!requestObject?.client_metadata?.jwks?.keys?.length,
+        hasEncAlgs: !!requestObject?.client_metadata?.encrypted_response_enc_values_supported?.length
+      });
+      throw new Error(`Failed to encrypt verifier payload: ${errorMessage}`);
+    }
   }
 }
