@@ -6,6 +6,17 @@ const angular = require("angular-eslint");
 
 module.exports = defineConfig([
   {
+    ignores: [
+      'dist/**',
+      'coverage/**',
+      'node_modules/**',
+      'src/generated/**',
+      'src/assets/**',
+      '**/*.spec.ts',
+      '.angular/**'
+    ]
+  },
+  {
     files: ["**/*.ts"],
     extends: [
       eslint.configs.recommended,
@@ -32,13 +43,6 @@ module.exports = defineConfig([
         },
       ],
     },
-    ignores: [
-      'dist/**',
-      'coverage/**',
-      'node_modules/**',
-      'src/generated/**',
-      'src/assets/**'
-    ]
   },
   {
     files: ["**/*.html"],

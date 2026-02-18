@@ -4,6 +4,14 @@
 
 name: "Advanced CodeQL Configuration for JavaScript/TypeScript"
 
+paths:
+  - src
+exclude-paths:
+  - src/generated
+  - node_modules
+  - dist
+  - coverage
+
 queries:
   - name: javascript-security-extended
     uses: javascript-security-extended

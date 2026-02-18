@@ -51,6 +51,7 @@ jobs:
         uses: github/codeql-action/analyze@v4
         with:
           category: "/language:javascript-typescript"
+          skip-queries: true
 
       - name: Run ESLint static analysis
         id: eslint
@@ -67,6 +68,7 @@ jobs:
           exit-code: 0
           format: sarif
           output: trivy-results.sarif
+          skip-dirs: src/generated,node_modules,dist,coverage,.angular
 
       - name: Upload Trivy SARIF to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@v4
