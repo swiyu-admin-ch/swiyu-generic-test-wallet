@@ -16,7 +16,6 @@ import {MatInput, MatInputModule} from "@angular/material/input";
         MatInputModule,
     ],
     templateUrl: './deeplink-input.html',
-    styleUrls: ['./deeplink-input.css'],
     standalone: true
 })
 export class DeeplinkInput {

@@ -14,3 +14,7 @@ out/
 /codeql/
 /swiyu-wallet-test-codeql-db/
 codeql-results.sarif
+
+### Sonar
+.scannerwork/.sonar_lock
+.scannerwork/report-task.txt
