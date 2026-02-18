@@ -6,11 +6,13 @@ name: "Advanced CodeQL Configuration for JavaScript/TypeScript"
 
 paths:
   - src
-exclude-paths:
-  - src/generated
-  - node_modules
-  - dist
-  - coverage
+
+paths-ignore:
+  - src/generated/**
+  - node_modules/**
+  - dist/**
+  - coverage/**
+  - .angular/**
 
 queries:
   - name: javascript-security-extended
