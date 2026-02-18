@@ -1,0 +1,8 @@
+# Ignored files
+node_modules/
+dist/
+.angular/
+coverage/
+src/generated/
+**/*.spec.ts
+
