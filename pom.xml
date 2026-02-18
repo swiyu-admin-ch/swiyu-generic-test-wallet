@@ -13,7 +13,7 @@
 
     <properties>
         <node.version>v20.22.0</node.version>
-        <npm.version>9.8.1</npm.version>
+        <npm.version>10.5.0</npm.version>
     </properties>
 
     <build>
@@ -21,34 +21,68 @@
             <plugin>
                 <groupId>com.github.eirslett</groupId>
                 <artifactId>frontend-maven-plugin</artifactId>
-                <version>1.12.1</version>
+                <version>1.14.2</version>
                 <configuration>
                     <workingDirectory>${project.basedir}</workingDirectory>
+                    <nodeVersion>${node.version}</nodeVersion>
+                    <npmVersion>${npm.version}</npmVersion>
                 </configuration>
                 <executions>
                     <execution>
                         <id>install node and npm</id>
+                        <phase>initialize</phase>
                         <goals>
                             <goal>install-node-and-npm</goal>
                         </goals>
                     </execution>
                     <execution>
-                        <id>npm install</id>
+                        <id>npm ci</id>
+                        <phase>initialize</phase>
                         <goals>
                             <goal>npm</goal>
                         </goals>
                         <configuration>
-                            <arguments>install</arguments>
+                            <arguments>ci</arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>npm run generate:apis</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <configuration>
+                            <arguments>run generate:apis</arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>npm run lint</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <configuration>
+                            <arguments>run lint</arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>npm run test</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <configuration>
+                            <arguments>run test</arguments>
                         </configuration>
                     </execution>
                     <execution>
                         <id>npm run build</id>
+                        <phase>package</phase>
                         <goals>
                             <goal>npm</goal>
                         </goals>
-                        <phase>package</phase>
                         <configuration>
-                            <arguments>run build --if-present</arguments>
+                            <arguments>run build</arguments>
                         </configuration>
                     </execution>
                 </executions>
