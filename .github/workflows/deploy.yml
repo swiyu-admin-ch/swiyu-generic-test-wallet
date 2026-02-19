@@ -29,11 +29,7 @@ jobs:
         run: npm run generate:apis
 
       - name: Build Angular app
-        run: |
-          npx ng build \
-            --configuration=production \
-            --base-href="/${{ github.event.repository.name }}/" \
-            --deploy-url="/${{ github.event.repository.name }}/"
+        run: npx ng build --configuration=production --base-href="/" --deploy-url="/"
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
