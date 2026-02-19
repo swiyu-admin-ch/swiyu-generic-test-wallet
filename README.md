@@ -22,11 +22,6 @@ The Test Wallet is therefore a practical diagnostic and integration tool for dev
 - [Prerequisites](#prerequisites)
 - [Getting Started](#getting-started)
 - [Usage Guide](#usage-guide)
-  - [Part 1: Beta ID Issuance](#part-1-beta-id-issuance)
-  - [Part 2: Beta ID Verification](#part-2-beta-id-verification)
-  - [Extracting Deeplinks from QR Codes](#extracting-deeplinks-from-qr-codes)
-- [Browser CORS Configuration](#browser-cors-configuration)
-- [Deployment](#deployment)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -36,12 +31,11 @@ A public deployment of the SWIYU Generic Test Wallet is available at:
 
 [https://swiyu-admin-ch.github.io/swiyu-generic-test-wallet/](https://swiyu-admin-ch.github.io/swiyu-generic-test-wallet/)
 
-You can use this online version to test your own SWIYU Generic Issuer and Verifier deployments without running the application locally.
+You can use this online version to test your own SWIYU Generic Issuer and Verifier deployments without running the Generic Test Wallet locally.
 
-**Important:** To use the demo against locally deployed backend services, you may need to disable browser CORS security. This must be done **only for development and testing purposes**, and preferably in a dedicated browser profile. Refer to the [Browser CORS Configuration](#browser-cors-configuration) section.
+**Important:** To use the demo against locally deployed backend services, you may need to disable browser CORS security.
 
-
-For detailed step-by-step instructions on how to perform issuance and verification flows, please refer to the [Usage Guide](#usage-guide) section below.
+*⚠️ Security Warning: Disabling CORS should only be done on a separate browser profile used exclusively for development and testing. Never disable CORS on your main browser profile.*
 
 ## Prerequisites
 
@@ -107,8 +101,18 @@ The build artifacts will be stored in the `dist/` directory.
 npm run lint
 ```
 
+## Usage Guide
 
-## Contributions and feedback
+For detailed step-by-step instructions on testing credential issuance and verification flows, please refer to the [Usage Guide](./GUIDE.md).
+
+The guide covers:
+- Browser CORS Configuration
+- Understanding Deeplinks
+- Part 1: Issuance
+- Part 2: Verification
+- Extracting Deeplinks from QR Codes
+
+## Contributing
 
 We welcome any feedback on the code regarding both the implementation and security aspects.
 Please follow the guidelines for contributing found in [CONTRIBUTING.md](/CONTRIBUTING.md).
@@ -116,3 +120,4 @@ Please follow the guidelines for contributing found in [CONTRIBUTING.md](/CONTRI
 ## License
 
 This project is licensed under the terms of the MIT license. See the [LICENSE](/LICENSE) file for details.
+
