@@ -107,27 +107,6 @@ The build artifacts will be stored in the `dist/` directory.
 npm run lint
 ```
 
-## Usage Guide
-
-This section provides step-by-step instructions for testing credential issuance and verification flows using the SWIYU Generic Test Wallet.
-
-### Part 1: Beta ID Issuance
-
-### Part 2: Beta ID Verification
-
-### Extracting Deeplinks from QR Codes
-
-## Browser CORS Configuration
-
-To test the wallet locally with backend services, you may need to disable CORS (Cross-Origin Resource Sharing) security in your browser. This is **only recommended for development and testing purposes**.
-
-**⚠️ Security Warning**: Disabling CORS should only be done on a separate browser profile used exclusively for development and testing. Never disable CORS on your main browser profile.
-
-### For Google Chrome
-
-```bash
-google-chrome --disable-web-security --user-data-dir="/tmp/chrome_dev_session"
-```
 
 ## Contributions and feedback
 
