@@ -67,7 +67,7 @@ The system should now go through several steps (Resolving `deeplink`, Metadata, 
 
 #### Initiate a verification
 
-Go back to the start page of the BCS website and click the **Verify** button in the **Verify Beta ID** section.
+Go back to the start page of the BCS website and click the **Verify** button in the **Check a Beta ID** section.
 
 ![Screenshot](./docs/screenshots/screenshot_07.png)
 

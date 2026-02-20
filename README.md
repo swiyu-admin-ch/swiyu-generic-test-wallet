@@ -1,14 +1,8 @@
-<!--
-SPDX-FileCopyrightText: 2025 Swiss Confederation
-
-SPDX-License-Identifier: MIT
--->
-
 ![github-banner](https://github.com/swiyu-admin-ch/swiyu-admin-ch.github.io/blob/main/assets/images/github-banner.jpg)
 
 # SWIYU Generic Test Wallet
 
-The SWIYU Generic Test Wallet is a lightweight web application that simulates a wallet to test credential issuance and verification flows based on OIDC4VCI and OIDC4VP.
+The SWIYU Generic Test Wallet is a web application that simulates a wallet to test credential issuance and verification flows based on OIDC4VCI and OIDC4VP.
 
 It is primarily intended to validate your own deployment of the SWIYU Generic [Issuer](https://github.com/swiyu-admin-ch/swiyu-issuer) and [Verifier](https://github.com/swiyu-admin-ch/swiyu-verifier) components. During integration or configuration phases, it allows developers to execute real issuance and verification flows end-to-end, starting from a deeplink and following the complete protocol exchange.
 
@@ -47,11 +41,6 @@ Before starting the development server or building the application, ensure you h
 |------|---------|---------|
 | **Node.js** | 20.x or 22.x | JavaScript runtime |
 | **npm** | 9.x or higher | Package manager |
-
-### Browser Requirements
-
-- **Modern browser** (Chrome, Firefox, Edge, Safari) with ES2020+ support
-- **Developer Tools** (F12) for extracting deeplinks from QR codes and network requests
 
 ## Getting Started
 
