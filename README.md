@@ -1,14 +1,14 @@
 ![github-banner](https://github.com/swiyu-admin-ch/swiyu-admin-ch.github.io/blob/main/assets/images/github-banner.jpg)
 
-# SWIYU Generic Test Wallet
+# swiyu Generic Test Wallet
 
-The SWIYU Generic Test Wallet is a web application that simulates a wallet to test credential issuance and verification flows based on OIDC4VCI and OIDC4VP.
+The swiyu Generic Test Wallet is a web application that simulates a wallet to test credential issuance and verification flows based on OIDC4VCI and OIDC4VP.
 
-It is primarily intended to validate your own deployment of the SWIYU Generic [Issuer](https://github.com/swiyu-admin-ch/swiyu-issuer) and [Verifier](https://github.com/swiyu-admin-ch/swiyu-verifier) components. During integration or configuration phases, it allows developers to execute real issuance and verification flows end-to-end, starting from a deeplink and following the complete protocol exchange.
+It is primarily intended to validate your own deployment of the swiyu Generic [Issuer](https://github.com/swiyu-admin-ch/swiyu-issuer) and [Verifier](https://github.com/swiyu-admin-ch/swiyu-verifier) components. During integration or configuration phases, it allows developers to execute real issuance and verification flows end-to-end, starting from a deeplink and following the complete protocol exchange.
 
 Because it behaves like a minimal wallet frontend, it makes the different protocol steps visible and reproducible. This helps quickly identify whether a failure is caused by configuration issues, endpoint exposure, trust setup, metadata problems, or protocol-level errors without needing a real mobile wallet.
 
-The Test Wallet is therefore a practical diagnostic and integration tool for developers deploying and configuring the SWIYU Generic components.
+The Test Wallet is therefore a practical diagnostic and integration tool for developers deploying and configuring the swiyu Generic components.
 
 ## Table of Contents
 
@@ -21,11 +21,11 @@ The Test Wallet is therefore a practical diagnostic and integration tool for dev
 
 ## Demo
 
-A public deployment of the SWIYU Generic Test Wallet is available at:
+A public deployment of the swiyu Generic Test Wallet is available at:
 
 [https://swiyu-admin-ch.github.io/swiyu-generic-test-wallet/](https://swiyu-admin-ch.github.io/swiyu-generic-test-wallet/)
 
-You can use this online version to test your own SWIYU Generic Issuer and Verifier deployments without running the Generic Test Wallet locally.
+You can use this online version to test your own swiyu Generic Issuer and Verifier deployments without running the Generic Test Wallet locally.
 
 **Important:** To use the demo against locally deployed backend services, you may need to disable browser CORS security.
 
