@@ -15,6 +15,7 @@ The Test Wallet is therefore a practical diagnostic and integration tool for dev
 - [Demo](#demo)
 - [Prerequisites](#prerequisites)
 - [Getting Started](#getting-started)
+- [Supported Features](#supported-features)
 - [Usage Guide](#usage-guide)
 - [Contributing](#contributing)
 - [License](#license)
@@ -89,6 +90,56 @@ The build artifacts will be stored in the `dist/` directory.
 ```bash
 npm run lint
 ```
+
+## Supported Features
+
+### Credential Issuance (OIDC4VCI)
+
+Supported:
+
+- Issuance V1
+    Single `vc+sd-jwt` credential
+- Issuance V2
+    Batch credential endpoint (only the first credential of the batch is currently displayed)
+- Holder binding
+    Via `proof_type: jwt` (ES256)
+- Credential request encryption 
+    (wallet --> issuer)
+- Credential response encryption 
+    (issuer --> wallet)
+
+Not yet supported (will be available in the future):
+
+- Displaying the full batch of issued credentials
+- Credential renewal flow
+- DPoP (Demonstrating Proof of Possession)
+
+### Credential Verification (OIDC4VP)
+
+Supported:
+
+- Verification V1
+    DIF Presentation Exchange, builds a selective-disclosure VP token with a `kb+jwt`.
+- Verification V2
+    DCQL (Digital Credentials Query Language) same flow using a DCQL query.
+- Selective disclosure
+    Only the claims required by the verifier query are included in the VP token.
+- Key binding JWT (`kb+jwt`)
+    Appended to every VP token, bound to the holder key and the verifier nonce.
+- Response payload encryption (`direct_post.jwt`)
+    VP token is JWE-encrypted before submission.
+
+Not yet supported (will be available in the future):
+
+- DPoP (Demonstrating Proof of Possession)
+
+### Ephemeral Holder Keys and Page Refresh
+
+The wallet generates an ephemeral ES256 key pair (P-256) in memory each time the application loads or the page is refreshed. This key pair is used for holder binding during issuance and for signing the `kb+jwt` during verification.
+
+Refreshing the page generates a new key pair. All previously issued SD-JWTs become unusable for verification because the original private key is no longer available.
+
+Complete the full issuance and verification flow within a single browser session without refreshing the page.
 
 ## Usage Guide
 
