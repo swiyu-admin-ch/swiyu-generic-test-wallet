@@ -3,7 +3,7 @@ import * as jose from "jose";
 import { Credential } from "../credential/credential";
 import { ApiService } from "../api-service";
 import { FormsModule } from "@angular/forms";
-import { from, of, switchMap } from "rxjs";
+import { EMPTY, from, of, switchMap } from "rxjs";
 import { PanelComponent } from "../deeplink-resolver/panel.component";
 import { ChecklistEntry } from "../checklist-entry/checklist-entry";
 import { MatList } from "@angular/material/list";
@@ -15,11 +15,16 @@ import { CredentialService } from "@services/credential.service";
 import { DeeplinkInput } from "../deeplink-input/deeplink-input";
 import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { HolderKeyService } from "@services/holder-key.service";
+import { SdJwtStoreService } from "@services/sd-jwt-store.service";
 import { IssuerCredentialRequestEncryption, IssuerCredentialResponseEncryption, NonceResponse, OAuthToken } from "src/generated/issuer";
 import { JwtPayload, OpenIdMetadataResponse, CredentialResponse, RegistryEntry } from "@app/models/api-response";
+import { JsonViewer } from "@components/json-viewer/json-viewer";
+import { HolderKeysCardComponent } from "../components/holder-keys-card/holder-keys-card.component";
+import { catchError } from 'rxjs/operators';
+import { throwError } from 'rxjs';
 
 @Component({
-  selector: "app-credential-issuance-v2",
+  selector: "app-credential-issuance",
   imports: [
     MatCard,
     MatCardTitle,
@@ -34,14 +39,20 @@ import { JwtPayload, OpenIdMetadataResponse, CredentialResponse, RegistryEntry }
     MatInputModule,
     MatFormFieldModule,
     DeeplinkInput,
+    HolderKeysCardComponent,
+    JsonViewer,
   ],
-  templateUrl: "./credential-issuance-v2.html",
+  templateUrl: "./credential-issuance.html",
   standalone: true,
 })
-export class CredentialIssuanceV2 {
+export class CredentialIssuance {
   private apiService = inject(ApiService);
   private credentialService = inject(CredentialService);
   private holderKeyService = inject(HolderKeyService);
+  private sdJwtStore = inject(SdJwtStoreService);
+
+  sdJwt = this.sdJwtStore.getIssuanceSdJwt();
+
   readonly panelOpenState = signal(false);
   public input =
     "swiyu://?credential_offer=%7B%22grants%22%3A%7B%22urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Apre-authorized_code%22%3A%7B%22pre-authorized_code%22%3A%225c2ce09c-44ac-45a1-9d25-d066dd8ad277%22%7D%7D%2C%22version%22%3A%221.0%22%2C%22credential_issuer%22%3A%22https%3A%2F%2Fbcs.admin.ch%2Fbcs-web%2Fissuer-agent%2Foid4vci%22%2C%22credential_configuration_ids%22%3A%5B%22betaid-sdjwt%22%5D%7D";
@@ -51,6 +62,7 @@ export class CredentialIssuanceV2 {
   openIdConfig: WritableSignal<Record<string, unknown> | undefined> = signal(undefined);
   tokenResponse: WritableSignal<OAuthToken | undefined> = signal(undefined);
   nonceResponse: WritableSignal<NonceResponse | undefined> = signal(undefined);
+  credentialsResponse: WritableSignal<any | undefined> = signal(undefined);
   encodedCredential: WritableSignal<string | undefined> = signal(undefined);
   decodedPayload: WritableSignal<JwtPayload | undefined> = signal(undefined);
   decodedHeader: WritableSignal<JwtPayload | undefined> = signal(undefined);
@@ -58,6 +70,12 @@ export class CredentialIssuanceV2 {
 
   credentialRequestEncryption: WritableSignal<IssuerCredentialRequestEncryption | undefined> = signal(undefined);
   credentialResponseEncryption: WritableSignal<IssuerCredentialResponseEncryption | undefined> = signal(undefined);
+
+  metadataError = signal<string | undefined>(undefined);
+  openidError = signal<string | undefined>(undefined);
+  tokenError = signal<string | undefined>(undefined);
+  nonceError = signal<string | undefined>(undefined);
+  credentialError = signal<string | undefined>(undefined);
 
   public onClear(): void {
     this.reset();
@@ -72,6 +90,13 @@ export class CredentialIssuanceV2 {
     this.apiService
       .resolveOpenIdMetadataFromDeeplink(decodedDeeplink?.credential_issuer as string)
       .pipe(
+        catchError((error) => {
+          this.metadataError.set(
+            error?.message ?? "Failed to resolve OpenID metadata"
+          );
+
+          return EMPTY;
+        }),
         switchMap((metadata) => {
           if (metadata) {
             this.credentialRequestEncryption.set(metadata.credential_request_encryption);
@@ -88,14 +113,28 @@ export class CredentialIssuanceV2 {
             return of(null);
           }
         }),
+        catchError((error) => {
+          this.openidError.set(
+            error?.message ?? "Failed to resolve OpenID metadata"
+          );
+
+          return EMPTY;
+        }),
         switchMap((openIdConfig: Record<string, unknown> | null) => {
           this.openIdConfig.set(openIdConfig as Record<string, unknown> | undefined);
           return this.apiService.getAccessToken(
             (decodedDeeplink?.grants as Record<string, Record<string, string>>)?.[
-              "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+            "urn:ietf:params:oauth:grant-type:pre-authorized_code"
             ]?.["pre-authorized_code"],
             (openIdConfig as Record<string, unknown>)?.token_endpoint as string
           );
+        }),
+        catchError((error) => {
+          this.tokenError.set(
+            error?.message ?? "Failed to retrieve access token"
+          );
+
+          return EMPTY;
         }),
         switchMap((accessToken: OAuthToken) => {
           this.tokenResponse.set(accessToken);
@@ -104,10 +143,16 @@ export class CredentialIssuanceV2 {
             this.apiService.getNonce((this.metadata() as OpenIdMetadataResponse)?.["nonce_endpoint"] as string)
           );
         }),
+        catchError((error) => {
+          this.nonceError.set(
+            error?.message ?? "Failed to retrieve nonce"
+          );
+
+          return EMPTY;
+        }),
         switchMap((nonce: NonceResponse) => {
           this.nonceResponse.set(nonce);
-
-          return from(this.getCredentialRequestV2(nonce?.c_nonce));
+          return from(this.getCredentialRequestV2((this.metadata() as OpenIdMetadataResponse), nonce?.c_nonce));
         }),
         switchMap((request: Record<string, unknown>) => {
           return this.apiService.getCredentialV2(
@@ -115,6 +160,23 @@ export class CredentialIssuanceV2 {
             (this.tokenResponse() as OAuthToken)?.access_token,
             request as CredentialResponse
           );
+        }),
+        catchError((error) => {
+          this.credentialError.set(
+            error ?? "Failed to get credential"
+          );
+
+          return EMPTY;
+        }),
+        switchMap((credentialResponse: any) => {
+          this.credentialsResponse.set(credentialResponse);
+          return from(
+            this.apiService.processCredentialResponse(
+              credentialResponse,
+              this.metadata()?.credential_response_encryption,
+              this.metadata()?.credential_response_encryption?.encryption_required
+            )
+          )
         }),
         switchMap((credentialResponse: CredentialResponse) => {
           const credential = ((credentialResponse?.credentials as Record<string, unknown>[])?.[0] as Record<string, unknown>)?.credential as string;
@@ -156,6 +218,11 @@ export class CredentialIssuanceV2 {
     this.encodedCredential.set(undefined);
     this.decodedPayload.set(undefined);
     this.decodedHeader.set(undefined);
+    this.credentialRequestEncryption.set(undefined);
+    this.credentialResponseEncryption.set(undefined);
+    this.registryEntry.set(undefined);
+
+    this.tokenError.set(undefined);
   }
 
   public checkIfKeyPresent(): boolean {
@@ -181,15 +248,22 @@ export class CredentialIssuanceV2 {
   ): void {
     this.credentialConfig.set(
       (metadata?.credential_configurations_supported as Record<string, unknown>)?.[
-        (decodedDeeplink?.credential_configuration_ids as string[])?.[0]
+      (decodedDeeplink?.credential_configuration_ids as string[])?.[0]
       ] as Record<string, unknown> | undefined
     );
   }
 
-  private async getCredentialRequestV2(nonce: string): Promise<Record<string, unknown>> {
+  private async getCredentialRequestV2(
+    metadata: OpenIdMetadataResponse,
+    nonce: string
+  ): Promise<Record<string, unknown>> {
+
+    const credentialConfigurationId =
+      (this.deeplink() as Record<string, unknown>)?.credential_configuration_ids?.[0];
+
     const proofSigningAlgValuesSupported =
-      ((this.credentialConfig() as Record<string, unknown>)?.proof_types_supported as Record<string, Record<string, unknown>>)?.jwt
-        ?.proof_signing_alg_values_supported?.[0] as string;
+      ((this.credentialConfig() as Record<string, unknown>)?.proof_types_supported as Record<string, any>)?.jwt
+        ?.proof_signing_alg_values_supported?.[0];
 
     const jwt = await this.credentialService.createHolderBinding(
       (this.metadata() as OpenIdMetadataResponse)?.credential_issuer as string,
@@ -199,10 +273,17 @@ export class CredentialIssuanceV2 {
       this.holderKeyService.getJwk()
     );
 
+    const format = (
+      metadata.credential_configurations_supported[
+      credentialConfigurationId
+      ] as { format: string }
+    ).format;
+
     return {
-      credential_configuration_id:
-        (this.deeplink() as Record<string, unknown>)?.credential_configuration_ids?.[0],
+      format,
+      credential_configuration_id: credentialConfigurationId,
       proofs: {
+        proof_type: "jwt",
         jwt: [jwt],
       },
     };

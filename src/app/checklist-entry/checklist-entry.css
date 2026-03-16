@@ -1,0 +1,25 @@
+.checklist-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon {
+  flex-shrink: 0;
+}
+
+.icon--pending {
+  color: gray;
+}
+
+.icon--valid {
+  color: green;
+}
+
+.icon--invalid {
+  color: red;
+}
+
+.text {
+  flex: 1;
+}

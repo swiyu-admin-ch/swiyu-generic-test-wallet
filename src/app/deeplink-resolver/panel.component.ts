@@ -7,6 +7,7 @@ import { WritableSignal } from '@angular/core';
 @Component({
     selector: 'app-metadata-panel',
     templateUrl: './panel.component.html',
+    styleUrl: './panel.component.css',
     standalone: true,
     imports: [CommonModule, MatExpansionModule, MatIcon],
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -15,4 +16,5 @@ export class PanelComponent {
     @Input() panelOpenState: WritableSignal<boolean> | undefined;
     @Input() panelTitle: string;
     @Input() data: Record<string, unknown> | undefined = undefined;
+    @Input() errorMessage: string | undefined = undefined;
 }
