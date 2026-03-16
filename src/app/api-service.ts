@@ -6,7 +6,7 @@ import {
   HttpParams,
 } from "@angular/common/http";
 import { catchError, Observable, throwError, map, switchMap, from, of } from "rxjs";
-import { CompactEncrypt, importJWK, compactDecrypt, CompactJWEHeaderParameters, generateKeyPair, GenerateKeyPairOptions } from "jose";
+import { CompactEncrypt, importJWK, compactDecrypt, CompactJWEHeaderParameters, generateKeyPair, GenerateKeyPairOptions, JWK } from "jose";
 import { IssuerCredentialRequestEncryption, IssuerCredentialResponseEncryption, NonceResponse, OAuthToken } from "src/generated/issuer";
 import {
   OpenIdMetadataResponse,
@@ -18,12 +18,13 @@ import {
   RegistryEntry
 } from "@app/models/api-response";
 import { RequestObject } from "src/generated/verifier";
+import { JWKS } from "@models/jwks"
 
 @Injectable({
   providedIn: "root",
 })
 export class ApiService {
-  private http = inject(HttpClient)
+  private http = inject(HttpClient);
   private ephemeralPrivateKey?: CryptoKey;
 
   public resolveOpenIdMetadataFromDeeplink(
@@ -33,7 +34,7 @@ export class ApiService {
       .get<OpenIdMetadataResponse>(`${issuerCredentialUrl}/.well-known/openid-credential-issuer`, {
         responseType: "json",
       })
-      .pipe(catchError(this.handleError));
+      .pipe(catchError((error) => this.handleError(error, `${issuerCredentialUrl}/.well-known/openid-credential-issuer`)));
   }
 
   public resolveOpenIdConfigMetadataFromDeeplink(
@@ -47,7 +48,7 @@ export class ApiService {
       .get<OpenIdConfigResponse>(`${issuerCredentialUrl}/.well-known/openid-configuration`, {
         responseType: "json",
       })
-      .pipe(catchError(this.handleError));
+      .pipe(catchError((error) => this.handleError(error, `${issuerCredentialUrl}/.well-known/openid-configuration`)));
   }
 
   public resolveRequestObjectFromDeeplink(
@@ -66,11 +67,11 @@ export class ApiService {
           try {
             return JSON.parse(response) as JwtPayload;
           } catch (error) {
-            console.log(error);
+            console.error(error);
             return this.decodeJwtPayload(response);
           }
         }),
-        catchError(this.handleError)
+        catchError((error) => this.handleError(error, verifierRequestObjectUrl))
       );
   }
 
@@ -103,7 +104,7 @@ export class ApiService {
         responseType: "json",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       })
-      .pipe(catchError((err: HttpErrorResponse) => this.handleError(err)));
+      .pipe(catchError((error) => this.handleError(error, tokenEndpointUrl)));
   }
 
   public getNonce(nonceEndpoint: string): Observable<NonceResponse> {
@@ -114,9 +115,9 @@ export class ApiService {
     return this.http
       .post<NonceResponse>(`${nonceEndpoint}`, {},
         {
-        responseType: "json",
-      })
-      .pipe(catchError(this.handleError));
+          responseType: "json",
+        })
+      .pipe(catchError((error) => this.handleError(error, nonceEndpoint)));
   }
 
   public getCredential(
@@ -133,7 +134,7 @@ export class ApiService {
         responseType: "json",
         headers: { Authorization: `Bearer ${bearerToken}` },
       })
-      .pipe(catchError(this.handleError));
+      .pipe(catchError((error) => this.handleError(error, issuerCredentialUrl)));
   }
 
   public async generatePayloadEncryptionKey(alg: string, options?: GenerateKeyPairOptions): Promise<void> {
@@ -146,21 +147,24 @@ export class ApiService {
     metadata: OpenIdMetadataResponse,
     bearerToken: string,
     payload: CredentialResponse
-  ): Observable<CredentialResponse> {
+  ): Observable<any> {
+
     const issuerCredentialUrl = metadata.credential_endpoint as string;
 
     if (!issuerCredentialUrl) {
       return throwError(() => new Error("No issuer_credential_url provided"));
     }
 
-    const requestEncryption = metadata.credential_request_encryption as IssuerCredentialRequestEncryption;
-    const responseEncryption = metadata.credential_response_encryption as IssuerCredentialResponseEncryption;
+    const requestEncryption =
+      metadata.credential_request_encryption as IssuerCredentialRequestEncryption;
+
     const isEncrypted = requestEncryption?.encryption_required === true;
 
     return from(
       this.prepareCredentialRequest(payload, requestEncryption)
     ).pipe(
       switchMap((preparedPayload) => {
+
         let headers = new HttpHeaders({
           Authorization: `Bearer ${bearerToken}`,
           "SWIYU-API-Version": "2",
@@ -168,31 +172,35 @@ export class ApiService {
 
         if (isEncrypted) {
           headers = headers.set("Content-Type", "application/jwt");
-          return this.http.post(issuerCredentialUrl, preparedPayload, {
-            responseType: "text" as const,
-            headers: headers,
-          });
+
+          return this.http.post<string>(
+            issuerCredentialUrl,
+            preparedPayload,
+            {
+              headers,
+              responseType: 'text' as any
+            }
+          );
+
         } else {
           headers = headers.set("Content-Type", "application/json");
-          return this.http.post<CredentialResponse>(issuerCredentialUrl, preparedPayload, {
-            responseType: "json" as const,
-            headers: headers,
-          });
+
+          return this.http.post<CredentialResponse>(
+            issuerCredentialUrl,
+            preparedPayload,
+            {
+              headers,
+              responseType: "json",
+            }
+          );
         }
       }),
-      switchMap((response: CredentialResponse | string) => {
-        return from(
-          this.processCredentialResponse(
-            response,
-            responseEncryption,
-            isEncrypted
-          )
-        );
-      }),
       catchError((error: HttpErrorResponse | Error) => {
-        const errorMsg = error instanceof HttpErrorResponse
-          ? `Credential fetch failed (HTTP ${error.status}): ${error.message}`
-          : `Credential fetch failed: ${error.message}`;
+        const errorMsg =
+          error instanceof HttpErrorResponse
+            ? `Credential fetch failed (HTTP ${error.status}): ${error.message}`
+            : `Credential fetch failed: ${error.message}`;
+
         console.error(errorMsg);
         return throwError(() => new Error(errorMsg));
       })
@@ -203,39 +211,54 @@ export class ApiService {
     payload: CredentialResponse,
     requestEncryption?: IssuerCredentialRequestEncryption
   ): Promise<CredentialResponse | string> {
-    if (!requestEncryption || !requestEncryption.encryption_required) {
+
+    if (!requestEncryption?.encryption_required) {
       return payload;
     }
 
     try {
-      if (!requestEncryption.jwks && !requestEncryption.jwks["keys"]) {
-        throw new Error("No JWKS provided in credential_request_encryption");
+
+      const jwks = requestEncryption.jwks as JWKS | undefined;
+      const keys = jwks?.keys;
+
+      if (!Array.isArray(keys) || keys.length === 0) {
+        throw new Error(
+          "No encryption keys available in credential_request_encryption.jwks.keys"
+        );
       }
 
-      const keys = requestEncryption.jwks["keys"];
+      const encKey = keys[0];
 
-      if (!keys || keys.length === 0) {
-        throw new Error("No encryption keys available in credential_request_encryption.jwks.keys");
+      const encAlg = encKey.alg ?? "ECDH-ES";
+      const encEnc = requestEncryption.enc_values_supported?.[0];
+      const zipSupported = requestEncryption.zip_values_supported?.[0];
+
+      if (!encEnc) {
+        throw new Error(
+          "No supported encryption value provided in enc_values_supported"
+        );
       }
 
-      const encKey = keys[0] as Record<string, string>;
-      const encAlg = encKey.alg || "ECDH-ES";
-      const encEnc = requestEncryption.enc_values_supported[0]
-      encKey.enc = encEnc
-      const zipSupported = requestEncryption.zip_values_supported[0];
+      if (!encKey.kid) {
+        throw new Error("Encryption key is missing required 'kid'");
+      }
+
+      if (!encKey.crv) {
+        throw new Error("Encryption key is missing required 'crv'");
+      }
 
       const recipientPublicKey = await importJWK(encKey, encAlg);
 
-      this.generatePayloadEncryptionKey(encAlg, { crv: encKey.crv });
+      await this.generatePayloadEncryptionKey(encAlg, { crv: encKey.crv });
 
       const plaintext = new TextEncoder().encode(JSON.stringify(payload));
 
       const protectedHeader: CompactJWEHeaderParameters = {
         alg: encAlg,
         enc: encEnc,
-        zip: zipSupported,
         typ: "JWT",
-        kid: encKey.kid
+        kid: encKey.kid,
+        ...(zipSupported ? { zip: zipSupported } : {})
       };
 
       const encryptedJwe = await new CompactEncrypt(plaintext)
@@ -243,19 +266,25 @@ export class ApiService {
         .encrypt(recipientPublicKey);
 
       return encryptedJwe;
+
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown encryption error";
+
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown encryption error";
+
       console.error("Credential request encryption failed:", error);
+
       throw new Error(`Failed to encrypt credential request: ${errorMessage}`);
     }
   }
 
-  private async processCredentialResponse(
+  public async processCredentialResponse(
     response: CredentialResponse | string,
     responseEncryption?: IssuerCredentialResponseEncryption,
     isEncrypted = false
   ): Promise<CredentialResponse> {
-    if (!isEncrypted || !responseEncryption?.encryption_required) {
+
+    if (!responseEncryption?.encryption_required && !isEncrypted) {
       return response as CredentialResponse;
     }
 
@@ -285,12 +314,13 @@ export class ApiService {
 
   public getRegistryEntry(registryEntryUrl: string): Observable<RegistryEntry[]> {
     const url = this.getRegistryEntryLocation(registryEntryUrl);
-    return this.http.get<RegistryEntry[]>(url).pipe(catchError(this.handleError));
+    return this.http.get<RegistryEntry[]>(url).pipe(catchError((error) => this.handleError(error, url)));
   }
 
-  private handleError(error: HttpErrorResponse): Observable<never> {
+  private handleError(error: HttpErrorResponse | Error, url?: string): Observable<never> {
     console.error(error);
-    return throwError(() => new Error("An error occurred while fetching data"));
+
+    return throwError(() => error);
   }
 
   private getRegistryEntryLocation(iss: string): string {
@@ -428,7 +458,7 @@ export class ApiService {
       }
 
       const encryptionAlg = encryptionKey.alg;
-      const encryptionEnc = requestObject.client_metadata.encrypted_response_enc_values_supported[0]; // Ex: A128GCM
+      const encryptionEnc = requestObject.client_metadata.encrypted_response_enc_values_supported[0];
 
       const publicKey = await importJWK(encryptionKey, encryptionAlg);
 

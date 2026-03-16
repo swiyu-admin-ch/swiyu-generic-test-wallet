@@ -15,9 +15,13 @@ import { DeeplinkInput } from "../deeplink-input/deeplink-input";
 import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { VerificationService } from "@services/verification.service";
 import { HolderKeyService } from "@services/holder-key.service";
+import { SdJwtDecoderService } from "@services/sd-jwt-decoder.service";
+import { SdJwtStoreService } from "@services/sd-jwt-store.service";
 import { Router } from "@angular/router";
 import { Field, PresentationDefinition, RequestObject } from "src/generated/verifier";
 import { JwtPayload } from "@app/models/api-response";
+import { JsonViewer } from "@components/json-viewer/json-viewer";
+import { HolderKeysCardComponent } from "../components/holder-keys-card/holder-keys-card.component";
 
 @Component({
   selector: "app-credential-verification-v1",
@@ -37,6 +41,8 @@ import { JwtPayload } from "@app/models/api-response";
     MatCard,
     MatCardTitle,
     MatCardContent,
+    HolderKeysCardComponent,
+    JsonViewer,
   ],
   templateUrl: "./credential-verification-v1.html",
   standalone: true,
@@ -46,6 +52,10 @@ export class CredentialVerificationV1 {
   private credentialService = inject(CredentialService);
   private verificationService = inject(VerificationService);
   private holderKeyService = inject(HolderKeyService);
+  private sdJwtStore = inject(SdJwtStoreService);
+
+  sdJwt = this.sdJwtStore.getVerificationSdJwt();
+  private sdJwtDecoder = inject(SdJwtDecoderService);
   private router = inject(Router);
 
   readonly panelOpenState = signal(false);
@@ -409,9 +419,6 @@ export class CredentialVerificationV1 {
     const saltBytes = new Uint8Array(16);
     crypto.getRandomValues(saltBytes);
     let binary = '';
-    // for (let i = 0; i < saltBytes.length; i++) {
-    //   binary += String.fromCharCode(saltBytes[i]);
-    // }
     saltBytes.forEach(saltByte => {
       binary += String.fromCharCode(saltByte);
     });
@@ -424,9 +431,6 @@ export class CredentialVerificationV1 {
   private base64UrlEncode(input: string): string {
     const bytes = new TextEncoder().encode(input);
     let binary = '';
-    // for (let i = 0; i < bytes.length; i++) {
-    //   binary += String.fromCharCode(bytes[i]);
-    // }
     bytes.forEach(byte => {
       binary += String.fromCharCode(byte);
     });

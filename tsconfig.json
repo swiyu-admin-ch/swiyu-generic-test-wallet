@@ -23,6 +23,12 @@
       ],
       "@modules/*": [
         "src/app/modules/*"
+      ],
+      "@models/*": [
+        "src/app/models/*"
+      ],
+      "@components/*": [
+        "src/app/components/*"
       ]
     }
   },

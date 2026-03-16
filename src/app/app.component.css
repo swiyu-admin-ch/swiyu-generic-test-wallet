@@ -1,0 +1,135 @@
+/* Layout Structure */
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+app-header {
+  flex-shrink: 0;
+}
+
+.app-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.app-navigation {
+  flex-shrink: 0;
+  background-color: #fafafa;
+  border-bottom: 1px solid #e0e0e0;
+  width: 100%;
+  margin: 0;
+  padding: 0 !important;
+}
+
+.app-content {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+}
+
+/* Navigation Tabs Styling */
+::ng-deep .app-navigation {
+  margin: 0 !important;
+  padding: 0 !important;
+  height: auto;
+}
+
+::ng-deep .app-navigation .mat-mdc-tab-links {
+  display: flex !important;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  gap: 0;
+}
+
+::ng-deep .app-navigation mat-tab-link {
+  flex: 1;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: #666;
+  transition: all 0.3s ease;
+  padding: 16px 12px !important;
+  margin: 0 !important;
+  border-right: 1px solid #e0e0e0;
+  border-bottom: 3px solid transparent;
+}
+
+::ng-deep .app-navigation mat-tab-link:last-child {
+  border-right: none;
+}
+
+::ng-deep .app-navigation mat-tab-link:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Issuance Tabs Styling */
+::ng-deep .app-navigation mat-tab-link.tab-issuance {
+  color: #900006;
+  background-color: #9000061a;
+}
+
+::ng-deep .app-navigation mat-tab-link.tab-issuance:hover {
+  background-color: #9000062a;
+}
+
+::ng-deep .app-navigation mat-tab-link.tab-issuance.mat-mdc-tab-link-active {
+  background-color: #9000061a;
+  border-bottom-color: #900006;
+  color: #900006;
+  font-weight: 600;
+}
+
+/* Verification Tabs Styling */
+::ng-deep .app-navigation mat-tab-link.tab-verification {
+  color: #1e645a;
+  background-color: #1e645a1a;
+}
+
+::ng-deep .app-navigation mat-tab-link.tab-verification:hover {
+  background-color: #1e645a2a;
+}
+
+::ng-deep .app-navigation mat-tab-link.tab-verification.mat-mdc-tab-link-active {
+  background-color: #1e645a1a;
+  border-bottom-color: #1e645a;
+  color: #1e645a;
+  font-weight: 600;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  ::ng-deep .app-navigation mat-tab-link {
+    font-size: 12px;
+    padding: 12px 8px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  ::ng-deep .app-navigation mat-tab-link {
+    font-size: 11px;
+    padding: 10px 6px !important;
+  }
+}
+
+/* Print Styles */
+@media print {
+  app-header,
+  .app-navigation {
+    display: none;
+  }
+}
+

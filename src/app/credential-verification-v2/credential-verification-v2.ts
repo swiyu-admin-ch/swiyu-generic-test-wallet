@@ -14,9 +14,13 @@ import { DeeplinkInput } from "../deeplink-input/deeplink-input";
 import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { VerificationService } from "@services/verification.service";
 import { HolderKeyService } from "@services/holder-key.service";
+import { SdJwtDecoderService } from "@services/sd-jwt-decoder.service";
+import { SdJwtStoreService } from "@services/sd-jwt-store.service";
 import { Router } from "@angular/router";
 import { DcqlClaimDto, DcqlCredentialDto, DcqlQueryDto, RequestObject } from "src/generated/verifier";
 import { JwtPayload } from "@app/models/api-response";
+import { JsonViewer } from "@components/json-viewer/json-viewer";
+import { HolderKeysCardComponent } from "../components/holder-keys-card/holder-keys-card.component";
 
 @Component({
   selector: "app-credential-verification-v2",
@@ -34,6 +38,8 @@ import { JwtPayload } from "@app/models/api-response";
     MatCard,
     MatCardTitle,
     MatCardContent,
+    HolderKeysCardComponent,
+    JsonViewer,
   ],
   templateUrl: "./credential-verification-v2.html",
   standalone: true,
@@ -42,7 +48,11 @@ export class CredentialVerificationV2 {
   private apiService = inject(ApiService);
   private verificationService = inject(VerificationService);
   private holderKeyService = inject(HolderKeyService);
+  private sdJwtDecoder = inject(SdJwtDecoderService);
+  private sdJwtStore = inject(SdJwtStoreService);
   private router = inject(Router);
+
+  sdJwt = this.sdJwtStore.getVerificationSdJwt();
 
   readonly panelOpenState = signal(false);
   public input =

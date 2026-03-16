@@ -1,8 +1,3 @@
-/**
- * Generic API Response types
- * Used for responses that don't have specific generated types
- */
-
 import { OpenIdIssuerMetadata } from "./open-id-issuer-metadata";
 
 export type OpenIdMetadataResponse = OpenIdIssuerMetadata;

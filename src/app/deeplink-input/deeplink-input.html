@@ -1,12 +1,12 @@
 <form #f="ngForm" (ngSubmit)="onSubmit()" class="input-form" novalidate>
     <div class="resolver">
-        <mat-form-field class="example-full-width">
+        <mat-form-field appearance="outline" class="example-full-width">
             <mat-label>Enter deeplink here</mat-label>
             <textarea [(ngModel)]="input" matInput name="input" [placeholder]="label" rows="6"></textarea>
         </mat-form-field>
         <div class="actions">
-            <button color="primary" mat-raised-button type="submit">Resolve</button>
-            <button (click)="reset()" mat-stroked-button type="button">Clear</button>
+            <button color="primary" matButton="filled" type="submit">Resolve</button>
+            <button (click)="reset()" color="primary" matButton="outlined" type="button">Clear</button>
         </div>
     </div>
 </form>
