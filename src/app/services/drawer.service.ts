@@ -5,7 +5,7 @@ import { WritableSignal, signal } from '@angular/core';
   providedIn: 'root'
 })
 export class DrawerService {
-  private isWalletInfoDrawerOpen: WritableSignal<boolean> = signal(false);
+  private isWalletInfoDrawerOpen: WritableSignal<boolean> = signal(true);
 
   getIsWalletInfoDrawerOpen(): WritableSignal<boolean> {
     return this.isWalletInfoDrawerOpen;

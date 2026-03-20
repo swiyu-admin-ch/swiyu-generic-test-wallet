@@ -16,6 +16,7 @@ import { DeeplinkInput } from "../deeplink-input/deeplink-input";
 import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { HolderKeyService } from "@services/holder-key.service";
 import { SdJwtStoreService } from "@services/sd-jwt-store.service";
+import { MetadataSignatureTrackingService } from "@services/metadata-signature-tracking.service";
 import { IssuerCredentialRequestEncryption, IssuerCredentialResponseEncryption, NonceResponse, OAuthToken } from "src/generated/issuer";
 import { JwtPayload, OpenIdMetadataResponse, CredentialResponse, RegistryEntry } from "@app/models/api-response";
 import { JsonViewer } from "@components/json-viewer/json-viewer";
@@ -49,6 +50,7 @@ import { exportJWK, generateKeyPair } from "jose";
 export class CredentialIssuance {
   private apiService = inject(ApiService);
   private credentialService = inject(CredentialService);
+  private metadataSignatureTrackingService = inject(MetadataSignatureTrackingService);
   private holderKeyService = inject(HolderKeyService);
   private sdJwtStore = inject(SdJwtStoreService);
 
@@ -77,6 +79,9 @@ export class CredentialIssuance {
   tokenError = signal<string | undefined>(undefined);
   nonceError = signal<string | undefined>(undefined);
   credentialError = signal<string | undefined>(undefined);
+
+  openIdMetadataIsSigned = this.metadataSignatureTrackingService.getOpenIdMetadataIsSigned();
+  openIdConfigMetadataIsSigned = this.metadataSignatureTrackingService.getOpenIdConfigMetadataIsSigned();
 
   public onClear(): void {
     this.reset();

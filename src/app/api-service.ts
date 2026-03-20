@@ -19,12 +19,16 @@ import {
 } from "@app/models/api-response";
 import { RequestObject } from "src/generated/verifier";
 import { JWKS } from "@models/jwks"
+import { WalletOptionsService } from "@services/wallet-options.service";
+import { MetadataSignatureTrackingService } from "@services/metadata-signature-tracking.service";
 
 @Injectable({
   providedIn: "root",
 })
 export class ApiService {
   private http = inject(HttpClient);
+  private walletOptionsService = inject(WalletOptionsService);
+  private metadataSignatureTrackingService = inject(MetadataSignatureTrackingService);
   private ephemeralPrivateKey?: CryptoKey;
 
   public setResponseDecryptionKey(key: CryptoKey) {
@@ -34,11 +38,45 @@ export class ApiService {
   public resolveOpenIdMetadataFromDeeplink(
     issuerCredentialUrl: string
   ): Observable<OpenIdMetadataResponse> {
-    return this.http
-      .get<OpenIdMetadataResponse>(`${issuerCredentialUrl}/.well-known/openid-credential-issuer`, {
-        responseType: "json",
-      })
-      .pipe(catchError((error) => this.handleError(error, `${issuerCredentialUrl}/.well-known/openid-credential-issuer`)));
+    const walletOptions = this.walletOptionsService.getOptions();
+    const useSignedMetadata = walletOptions.useSignedMetadata;
+
+    if (useSignedMetadata) {
+      // Request signed metadata as JWT
+      return (this.http
+        .get(`${issuerCredentialUrl}/.well-known/openid-credential-issuer`, {
+          responseType: "text",
+          headers: new HttpHeaders({
+            "Accept": "application/jwt"
+          })
+        }) as Observable<string>)
+        .pipe(
+          map((jwt: string) => {
+            try {
+              // Decode JWT payload to get the metadata
+              const rawMetadata = this.decodeJwtPayload(jwt) as OpenIdMetadataResponse;
+              this.metadataSignatureTrackingService.setOpenIdMetadataIsSigned(true);
+              return rawMetadata;
+            } catch (error) {
+              throw new Error(`Failed to decode signed metadata JWT: ${error}`);
+            }
+          }),
+          catchError((error) => this.handleError(error, `${issuerCredentialUrl}/.well-known/openid-credential-issuer`))
+        );
+    } else {
+      // Request unsigned metadata as JSON
+      return this.http
+        .get<OpenIdMetadataResponse>(`${issuerCredentialUrl}/.well-known/openid-credential-issuer`, {
+          responseType: "json",
+          headers: new HttpHeaders({
+            "Accept": "application/json"
+          })
+        })
+        .pipe(
+          tap(() => this.metadataSignatureTrackingService.setOpenIdMetadataIsSigned(false)),
+          catchError((error) => this.handleError(error, `${issuerCredentialUrl}/.well-known/openid-credential-issuer`))
+        );
+    }
   }
 
   public resolveOpenIdConfigMetadataFromDeeplink(
@@ -48,11 +86,45 @@ export class ApiService {
       return throwError(() => new Error("No issuer_credential_url provided"));
     }
 
-    return this.http
-      .get<OpenIdConfigResponse>(`${issuerCredentialUrl}/.well-known/openid-configuration`, {
-        responseType: "json",
-      })
-      .pipe(catchError((error) => this.handleError(error, `${issuerCredentialUrl}/.well-known/openid-configuration`)));
+    const walletOptions = this.walletOptionsService.getOptions();
+    const useSignedMetadata = walletOptions.useSignedMetadata;
+
+    if (useSignedMetadata) {
+      // Request signed metadata as JWT
+      return (this.http
+        .get(`${issuerCredentialUrl}/.well-known/openid-configuration`, {
+          responseType: "text",
+          headers: new HttpHeaders({
+            "Accept": "application/jwt"
+          })
+        }) as Observable<string>)
+        .pipe(
+          map((jwt: string) => {
+            try {
+              // Decode JWT payload to get the metadata
+              const rawMetadata = this.decodeJwtPayload(jwt) as OpenIdConfigResponse;
+              this.metadataSignatureTrackingService.setOpenIdConfigMetadataIsSigned(true);
+              return rawMetadata;
+            } catch (error) {
+              throw new Error(`Failed to decode signed metadata JWT: ${error}`);
+            }
+          }),
+          catchError((error) => this.handleError(error, `${issuerCredentialUrl}/.well-known/openid-configuration`))
+        );
+    } else {
+      // Request unsigned metadata as JSON
+      return this.http
+        .get<OpenIdConfigResponse>(`${issuerCredentialUrl}/.well-known/openid-configuration`, {
+          responseType: "json",
+          headers: new HttpHeaders({
+            "Accept": "application/json"
+          })
+        })
+        .pipe(
+          tap(() => this.metadataSignatureTrackingService.setOpenIdConfigMetadataIsSigned(false)),
+          catchError((error) => this.handleError(error, `${issuerCredentialUrl}/.well-known/openid-configuration`))
+        );
+    }
   }
 
   public resolveRequestObjectFromDeeplink(
