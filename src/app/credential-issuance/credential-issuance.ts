@@ -16,6 +16,7 @@ import { DeeplinkInput } from "../deeplink-input/deeplink-input";
 import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { HolderKeyService } from "@services/holder-key.service";
 import { SdJwtStoreService } from "@services/sd-jwt-store.service";
+import { VcStoreService } from "@services/vc-store.service";
 import { MetadataSignatureTrackingService } from "@services/metadata-signature-tracking.service";
 import { IssuerCredentialRequestEncryption, IssuerCredentialResponseEncryption, NonceResponse, OAuthToken } from "src/generated/issuer";
 import { JwtPayload, OpenIdMetadataResponse, CredentialResponse, RegistryEntry } from "@app/models/api-response";
@@ -51,6 +52,7 @@ export class CredentialIssuance {
   private apiService = inject(ApiService);
   private credentialService = inject(CredentialService);
   private metadataSignatureTrackingService = inject(MetadataSignatureTrackingService);
+  private vcStoreService = inject(VcStoreService);
   private holderKeyService = inject(HolderKeyService);
   private sdJwtStore = inject(SdJwtStoreService);
 
@@ -204,15 +206,26 @@ export class CredentialIssuance {
           );
         }),
         switchMap((payload: Promise<Record<string, unknown>>) => {
-          void payload.then((decodedPayload) => {
-            this.decodedHeader.set((decodedPayload.protectedHeader as JwtPayload));
-            this.decodedPayload.set((decodedPayload.payload as JwtPayload));
-          });
-          return of(payload);
+          return from(payload).pipe(
+            tap((decodedPayload) => {
+              this.decodedHeader.set((decodedPayload.protectedHeader as JwtPayload));
+              this.decodedPayload.set((decodedPayload.payload as JwtPayload));
+            })
+          );
         })
       )
-      .subscribe((credential) => {
-        console.log("credential", credential);
+      .subscribe((decodedPayload) => {
+        console.log("credential decoded", decodedPayload);
+
+        // Add credential to VcStore
+        if (this.encodedCredential()) {
+          // Try to get vct from decoded payload, fallback to credential config id
+          const decodedPayloadData = this.decodedPayload() as Record<string, unknown>;
+          const credentialType = (decodedPayloadData?.vct as string) ||
+                                 (this.credentialConfig() as Record<string, unknown>)?.id as string ||
+                                 'Credential';
+          this.vcStoreService.addVC(credentialType, this.encodedCredential() || '');
+        }
       });
   }
 
@@ -229,7 +242,7 @@ export class CredentialIssuance {
     this.credentialRequestEncryption.set(undefined);
     this.credentialResponseEncryption.set(undefined);
     this.registryEntry.set(undefined);
-
+    this.credentialsResponse.set(undefined);
     this.tokenError.set(undefined);
   }
 

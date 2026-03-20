@@ -152,5 +152,12 @@ export class HolderKeysCardComponent implements OnInit {
       useSignedMetadata: value
     }));
   }
-}
 
+  copyCredentialToClipboard(sdJwt: string, credentialType: string): void {
+    navigator.clipboard.writeText(sdJwt).then(() => {
+      console.log(`Credential "${credentialType}" copied to clipboard`);
+    }).catch(err => {
+      console.error('Failed to copy credential to clipboard:', err);
+    });
+  }
+}
