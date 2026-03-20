@@ -20,8 +20,9 @@ import { IssuerCredentialRequestEncryption, IssuerCredentialResponseEncryption, 
 import { JwtPayload, OpenIdMetadataResponse, CredentialResponse, RegistryEntry } from "@app/models/api-response";
 import { JsonViewer } from "@components/json-viewer/json-viewer";
 import { HolderKeysCardComponent } from "../components/holder-keys-card/holder-keys-card.component";
-import { catchError } from 'rxjs/operators';
+import { catchError, tap } from 'rxjs/operators';
 import { throwError } from 'rxjs';
+import { exportJWK, generateKeyPair } from "jose";
 
 @Component({
   selector: "app-credential-issuance",
@@ -99,6 +100,8 @@ export class CredentialIssuance {
         }),
         switchMap((metadata) => {
           if (metadata) {
+            metadata.credential_request_encryption.encryption_required = true
+            metadata.credential_response_encryption.encryption_required = true
             this.credentialRequestEncryption.set(metadata.credential_request_encryption);
             this.credentialResponseEncryption.set(metadata.credential_response_encryption);
             this.metadata.set(metadata);
@@ -154,13 +157,13 @@ export class CredentialIssuance {
           this.nonceResponse.set(nonce);
           return from(this.getCredentialRequestV2((this.metadata() as OpenIdMetadataResponse), nonce?.c_nonce));
         }),
-        switchMap((request: Record<string, unknown>) => {
-          return this.apiService.getCredentialV2(
+        switchMap((request: Record<string, unknown>) =>
+          this.apiService.getCredentialV2(
             this.metadata(),
             (this.tokenResponse() as OAuthToken)?.access_token,
             request as CredentialResponse
-          );
-        }),
+          )
+        ),
         catchError((error) => {
           this.credentialError.set(
             error ?? "Failed to get credential"
@@ -279,13 +282,42 @@ export class CredentialIssuance {
       ] as { format: string }
     ).format;
 
-    return {
+    const payload: any = {
       format,
       credential_configuration_id: credentialConfigurationId,
       proofs: {
         proof_type: "jwt",
         jwt: [jwt],
       },
-    };
+    }
+
+    const responseEnc = metadata?.credential_response_encryption;
+
+    if (responseEnc) {
+      const alg = responseEnc.alg_values_supported?.[0];
+      const enc = responseEnc.enc_values_supported?.[0];
+
+      if (alg && enc) {
+        const ephemeralKeyPair = await this.generateEphemeralKeyPair(alg);
+        this.apiService.setResponseDecryptionKey(ephemeralKeyPair.privateKey);
+
+        const publicJwk = await exportJWK(ephemeralKeyPair.publicKey);
+        publicJwk.crv = "P-256"
+        publicJwk.use = "enc";
+        publicJwk.alg = "ECDH-ES"
+
+        payload.credential_response_encryption = {
+          alg,
+          enc,
+          jwk: publicJwk
+        };
+      }
+    }
+
+    return payload;
+  }
+
+  private async generateEphemeralKeyPair(alg: string) {
+    return await generateKeyPair(alg, { crv: "P-256" });
   }
 }

@@ -20,7 +20,6 @@ import { Router } from "@angular/router";
 import { DcqlClaimDto, DcqlCredentialDto, DcqlQueryDto, RequestObject } from "src/generated/verifier";
 import { JwtPayload } from "@app/models/api-response";
 import { JsonViewer } from "@components/json-viewer/json-viewer";
-import { HolderKeysCardComponent } from "../components/holder-keys-card/holder-keys-card.component";
 
 @Component({
   selector: "app-credential-verification-v2",
@@ -38,7 +37,6 @@ import { HolderKeysCardComponent } from "../components/holder-keys-card/holder-k
     MatCard,
     MatCardTitle,
     MatCardContent,
-    HolderKeysCardComponent,
     JsonViewer,
   ],
   templateUrl: "./credential-verification-v2.html",

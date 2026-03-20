@@ -5,7 +5,7 @@ import {
   HttpHeaders,
   HttpParams,
 } from "@angular/common/http";
-import { catchError, Observable, throwError, map, switchMap, from, of } from "rxjs";
+import { catchError, Observable, throwError, map, switchMap, from, of, tap } from "rxjs";
 import { CompactEncrypt, importJWK, compactDecrypt, CompactJWEHeaderParameters, generateKeyPair, GenerateKeyPairOptions, JWK } from "jose";
 import { IssuerCredentialRequestEncryption, IssuerCredentialResponseEncryption, NonceResponse, OAuthToken } from "src/generated/issuer";
 import {
@@ -26,6 +26,10 @@ import { JWKS } from "@models/jwks"
 export class ApiService {
   private http = inject(HttpClient);
   private ephemeralPrivateKey?: CryptoKey;
+
+  public setResponseDecryptionKey(key: CryptoKey) {
+    this.ephemeralPrivateKey = key;
+  }
 
   public resolveOpenIdMetadataFromDeeplink(
     issuerCredentialUrl: string
@@ -137,12 +141,6 @@ export class ApiService {
       .pipe(catchError((error) => this.handleError(error, issuerCredentialUrl)));
   }
 
-  public async generatePayloadEncryptionKey(alg: string, options?: GenerateKeyPairOptions): Promise<void> {
-    const { privateKey } = await generateKeyPair(alg, options);
-    this.ephemeralPrivateKey = privateKey;
-  }
-
-
   public getCredentialV2(
     metadata: OpenIdMetadataResponse,
     bearerToken: string,
@@ -180,8 +178,7 @@ export class ApiService {
               headers,
               responseType: 'text' as any
             }
-          );
-
+          )
         } else {
           headers = headers.set("Content-Type", "application/json");
 
@@ -248,8 +245,6 @@ export class ApiService {
       }
 
       const recipientPublicKey = await importJWK(encKey, encAlg);
-
-      await this.generatePayloadEncryptionKey(encAlg, { crv: encKey.crv });
 
       const plaintext = new TextEncoder().encode(JSON.stringify(payload));
 

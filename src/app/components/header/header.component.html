@@ -1,14 +1,25 @@
 <header class="app-header">
   <div class="header-content">
     <h1>swiyu Test Wallet</h1>
-    <button
-      mat-button
-      (click)="openGuide()"
-      class="guide-button-header"
-      aria-label="Open User Guide">
-      User Guide
-      <mat-icon>open_in_new</mat-icon>
-    </button>
+    <div class="header-buttons">
+      <button
+        mat-button
+        (click)="openGuide()"
+        class="guide-button-header"
+        aria-label="Open User Guide">
+        User Guide
+        <mat-icon>open_in_new</mat-icon>
+      </button>
+        <button
+                mat-button
+                (click)="toggleWalletInfo()"
+                matTooltip="Open wallet information"
+                aria-label="Open wallet information"
+                class="wallet-info-button">
+            Wallet
+            <mat-icon>info</mat-icon>
+        </button>
+    </div>
   </div>
 </header>
 

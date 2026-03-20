@@ -26,6 +26,12 @@
   flex: 1;
 }
 
+.header-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .guide-button-header {
   color: white !important;
   display: flex !important;
@@ -57,6 +63,18 @@
   display: inline-flex !important;
   color: white !important;
   margin-left: 4px;
+}
+
+::ng-deep .wallet-info-button {
+  color: white !important;
+}
+
+::ng-deep .wallet-info-button .mat-icon {
+  color: white !important;
+}
+
+::ng-deep .wallet-info-button:hover {
+  background-color: rgba(255, 255, 255, 0.15) !important;
 }
 
 /* Responsive Design */
