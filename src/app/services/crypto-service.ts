@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { CompactEncrypt, CompactJWEHeaderParameters, exportJWK, generateKeyPair, importJWK } from 'jose';
+import { compactDecrypt, CompactEncrypt, CompactJWEHeaderParameters, exportJWK, generateKeyPair, importJWK } from 'jose';
 
 @Injectable({
   providedIn: 'root',
@@ -73,5 +73,21 @@ export class CryptoService {
       .encrypt(publicKey);
 
     return encryptedJwe;
+  }
+
+  async decryptPayload(
+    input: any,
+    privateKey: CryptoKey,
+  ): Promise<any> {
+    try {
+      if (typeof input !== 'string') {
+        return input;
+      }
+      const { plaintext } = await compactDecrypt(input, privateKey);
+      const decoded = new TextDecoder().decode(plaintext);
+      return JSON.parse(decoded);
+    } catch (error) {
+      throw new Error(`Failed to decrypt payload: ${error}`);
+    }
   }
 }

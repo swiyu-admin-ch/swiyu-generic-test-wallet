@@ -15,7 +15,7 @@ import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { SdJwtStoreService } from "@services/sd-jwt-store.service";
 import { MetadataSignatureTrackingService } from "@services/metadata-signature-tracking.service";
 import { IssuerCredentialRequestEncryption, IssuerCredentialResponseEncryption, NonceResponse, OAuthToken } from "src/generated/issuer";
-import { JwtPayload, OpenIdMetadataResponse, RegistryEntry, OpenIdConfigResponse } from "@app/models/api-response";
+import { JwtPayload, OpenIdMetadataResponse, RegistryEntry, OpenIdConfigResponse, CredentialResponse } from "@app/models/api-response";
 import { JsonViewer } from "@components/json-viewer/json-viewer";
 import { HolderKeysCardComponent } from "../components/holder-keys-card/holder-keys-card.component";
 import { catchError, tap } from 'rxjs/operators';
@@ -24,6 +24,7 @@ import { CredentialOffer } from "@app/models/credential-offer";
 import { CryptoService } from "@app/services/crypto-service";
 import { ErrorFormatterService } from "@app/services/error-formatter-service";
 import { WalletService } from "@app/services/wallet-service";
+import * as jose from "jose";
 
 @Component({
   selector: "app-credential-issuance",
@@ -87,6 +88,13 @@ export class CredentialIssuance {
   nonce: WritableSignal<NonceResponse | undefined> = signal(undefined);
   nonceError = signal<Record<string, any> | string | undefined>(undefined);
 
+  registryEntry: WritableSignal<RegistryEntry[] | undefined> = signal(undefined);
+  registryEntryError = signal<Record<string, any> | string | undefined>(undefined);
+
+  decodedPayload: WritableSignal<JwtPayload | undefined> = signal(undefined);
+  decodedHeader: WritableSignal<JwtPayload | undefined> = signal(undefined);
+  decodedHeaderError = signal<Record<string, any> | string | undefined>(undefined);
+
 
   credentialConfig: WritableSignal<Record<string, unknown> | undefined> = signal(undefined);
   openIdConfig: WritableSignal<Record<string, unknown> | undefined> = signal(undefined);
@@ -94,9 +102,7 @@ export class CredentialIssuance {
   nonceResponse: WritableSignal<NonceResponse | undefined> = signal(undefined);
   credentialsResponse: WritableSignal<any | undefined> = signal(undefined);
   encodedCredential: WritableSignal<string | undefined> = signal(undefined);
-  decodedPayload: WritableSignal<JwtPayload | undefined> = signal(undefined);
-  decodedHeader: WritableSignal<JwtPayload | undefined> = signal(undefined);
-  registryEntry: WritableSignal<RegistryEntry[] | undefined> = signal(undefined);
+  
 
   credentialRequestEncryption: WritableSignal<IssuerCredentialRequestEncryption | undefined> = signal(undefined);
   credentialResponseEncryption: WritableSignal<IssuerCredentialResponseEncryption | undefined> = signal(undefined);
@@ -147,8 +153,6 @@ export class CredentialIssuance {
           this.credentialConfigurationsSupported.set(issuerMetadata.credential_configurations_supported);
           this.credentialRequestEncryption.set(issuerMetadata.credential_request_encryption);
           this.credentialResponseEncryption.set(issuerMetadata.credential_response_encryption);
-
-          console.log(this.credentialConfigurationsSupported())
         }),
         catchError((error) => {
           console.error(error);
@@ -237,8 +241,6 @@ export class CredentialIssuance {
             throw new Error("Missing nonce")
           }
 
-          console.log("B", this.walletService.getOptions().payloadEncryptionPreference)
-
           return this.walletService.buildRequestCredential(
             issuerMetadata, nonce, 1, this.walletService.getOptions().payloadEncryptionPreference
           );
@@ -267,9 +269,14 @@ export class CredentialIssuance {
             accessToken
           );
         }),
-        tap((credentialResponse: any) => {
+        switchMap((credentialResponse: any) => {
           this.credentialResponse.set(credentialResponse);
-          const credential: any = credentialResponse //this.cryptoService.decodeIfJwt<OpenIdMetadataResponse>(credentialResponse)
+
+          return from(
+            this.walletService.resolveResponseCredential(credentialResponse)
+          );
+        }),
+        tap((credential) => {
           this.credential.set(credential);
         }),
         catchError((error) => {
@@ -278,83 +285,44 @@ export class CredentialIssuance {
           return EMPTY;
         }),
         switchMap(() => {
-          return this.oidvciService.fetchRegistryEntry(
-            "",
-          );
+          const credential = this.credential().credentials[0].credential;
+          const registryEntry = this.walletService.buildRegistryUrl(credential)
+          return this.oidvciService.fetchRegistryEntry(registryEntry);
         }),
+        tap((registryEntry) => {
+          this.registryEntry.set(registryEntry);
+        }),
+        catchError((error) => {
+          console.error(error);
+          this.registryEntryError.set(this.errorFormatter.format(error));
+          return EMPTY;
+        }),
+        switchMap(() => {
+          const credential = this.credential().credentials[0].credential;
+          const registryEntry = this.registryEntry() as RegistryEntry[]
+          const jwt = credential.split("~")[0];
+          if (!registryEntry) {
+            throw new Error("Missing registryEntry");
+          }
+          return from(this.walletService.decodeJwt(jwt, registryEntry));
+        }),
+        tap((decodedPayload) => {
+          this.decodedHeader.set((decodedPayload.protectedHeader as JwtPayload));
+          this.decodedPayload.set((decodedPayload.payload as JwtPayload));
+        })
       )
       .subscribe(() => {
-        // this.vcStoreService.addVC(credentialType, this.encodedCredential() || '');
-        console.log("DONE")
+        const credential = this.credential().credentials[0].credential;
+        if (credential) {
+          this.encodedCredential.set(credential);
+          const decodedPayloadData = this.decodedPayload() as Record<string, unknown>;
+          const credentialType = (decodedPayloadData?.["vct"] as string) ||
+                                  (this.credentialConfig() as Record<string, unknown>)?.["id"] as string ||
+                                  'Credential';
+                
+          this.walletService.addVC(credentialType, credential);
+        }
       });
-    //             switchMap((nonce: NonceResponse) => {
-    //               this.nonceResponse.set(nonce);
-    //               return from(this.getCredentialRequestV2((this.metadata() as OpenIdMetadataResponse), nonce?.c_nonce));
-    //             }),
-    //             switchMap((request: Record<string, unknown>) =>
-    //               this.apiService.getCredentialV2(
-    //                 this.metadata(),
-    //                 (this.tokenResponse() as OAuthToken)?.access_token,
-    //                 request as CredentialResponse
-    //               )
-    //             ),
-    //             catchError((error) => {
-    //               this.credentialError.set(
-    //                 error ?? "Failed to get credential"
-    //               );
-    //               return EMPTY;
-    //             }),
-    //             switchMap((credentialResponse: any) => {
-    //               this.credentialsResponse.set(credentialResponse);
-    //               return from(
-    //                 this.apiService.processCredentialResponse(
-    //                   credentialResponse,
-    //                   this.metadata()?.credential_response_encryption,
-    //                   this.metadata()?.credential_response_encryption?.encryption_required
-    //                 )
-    //               )
-    //             }),
-    //             switchMap((credentialResponse: CredentialResponse) => {
-    //               const credential = ((credentialResponse?.credentials as Record<string, unknown>[])?.[0] as Record<string, unknown>)?.credential as string;
-    //               const token = credential.split("~")[0];
-    //               const decoded = jose.decodeJwt(token) as JwtPayload;
-    //               this.encodedCredential.set(credential);
-    //               return this.apiService.getRegistryEntry(decoded.iss as string);
-    //             }),
-    //             switchMap((registryEntry: RegistryEntry[]) => {
-    //               const jwt = (this.encodedCredential() as string).split("~")[0];
-    //               this.registryEntry.set(registryEntry);
-    //               return of(
-    //                 this.credentialService.decodeResponse(
-    //                   jwt,
-    //                   this.registryEntry() as RegistryEntry[]
-    //                 )
-    //               );
-    //             }),
-    //             switchMap((payload: Promise<Record<string, unknown>>) => {
-    //               return from(payload).pipe(
-    //                 tap((decodedPayload) => {
-    //                   this.decodedHeader.set((decodedPayload.protectedHeader as JwtPayload));
-    //                   this.decodedPayload.set((decodedPayload.payload as JwtPayload));
-    //                 })
-    //               );
-    //             })
-    //           );
-    //         })
-    //       );
-    //   })
-    // )
-    // .subscribe((decodedPayload) => {
-    //   console.log("credential decoded", decodedPayload);
-
-    //   if (this.encodedCredential()) {
-    //     const decodedPayloadData = this.decodedPayload() as Record<string, unknown>;
-    //     const credentialType = (decodedPayloadData?.vct as string) ||
-    //                            (this.credentialConfig() as Record<string, unknown>)?.id as string ||
-    //                            'Credential';
-    //     this.vcStoreService.addVC(credentialType, this.encodedCredential() || '');
-    //   }
-    // });
   }
 
   public reset(): void {

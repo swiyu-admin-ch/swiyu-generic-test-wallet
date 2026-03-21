@@ -74,9 +74,9 @@ export class CredentialVerificationV2 {
   constructor(
   ) {
     const navigation = this.router.getCurrentNavigation();
-    // if (navigation?.extras?.state?.credential) {
-    //   this.credentialInput.set(navigation.extras.state.credential);
-    // }
+    if (navigation?.extras?.state?.["credential"]) {
+      this.credentialInput.set(navigation.extras.state["credential"]);
+    }
   }
 
   public onClear(): void {

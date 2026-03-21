@@ -9,10 +9,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { FormsModule } from '@angular/forms';
 import { HolderKeyService } from '@services/holder-key.service';
-import { VcStoreService } from '@services/vc-store.service';
-import { WritableSignal, signal } from '@angular/core';
-import { WalletService } from '@app/services/wallet-service';
-import { WalletOptions } from '@app/models/wallet-options';
+import { WalletService } from '@services/wallet-service';
+import { signal, WritableSignal } from '@angular/core';
 
 @Component({
   selector: 'app-holder-keys-card',
@@ -33,25 +31,18 @@ import { WalletOptions } from '@app/models/wallet-options';
 export class HolderKeysCardComponent implements OnInit {
   private holderKeyService = inject(HolderKeyService);
   private walletService = inject(WalletService);
-  private vcStoreService = inject(VcStoreService);
 
   holderKeyGeneratedAt: WritableSignal<Date | null> = signal(null);
-  isExpanded: WritableSignal<boolean> = signal(true);
-  ephemeralKeysUrl = 'https://github.com/swiyu-admin-ch/swiyu-generic-test-wallet?tab=readme-ov-file#ephemeral-holder-keys-and-page-refresh';
-  requestedVCs = this.vcStoreService.getRequestedVCs();
-
-  // Wallet Options
-  walletOptions: WritableSignal<WalletOptions> = signal({
-    payloadEncryptionPreference: false,
-    numberOfProofs: false,
-    useSignedMetadata: false
-  });
   numberOfProofsInput: WritableSignal<string> = signal('');
   useCustomNumberOfProofs: WritableSignal<boolean> = signal(false);
-  useSignedMetadata: WritableSignal<boolean> = signal(false);
+
+  walletOptions = this.walletService.getOptionsSignal();
+  requestedVCs = this.walletService.getRequestedVCs();
+  ephemeralKeysUrl = 'https://github.com/swiyu-admin-ch/swiyu-generic-test-wallet?tab=readme-ov-file#ephemeral-holder-keys-and-page-refresh';
 
   ngOnInit(): void {
     this.updateKeyGenerationTime();
+    this.initializeNumberOfProofsInput();
 
     const checkInterval = setInterval(() => {
       const newTime = this.holderKeyService.getKeyGeneratedAt();
@@ -63,14 +54,18 @@ export class HolderKeysCardComponent implements OnInit {
     window.addEventListener('beforeunload', () => clearInterval(checkInterval));
   }
 
-  toggleExpand(): void {
-    this.isExpanded.update(value => !value);
-  }
-
   private updateKeyGenerationTime(): void {
     const keyTime = this.holderKeyService.getKeyGeneratedAt();
     if (keyTime) {
       this.holderKeyGeneratedAt.set(keyTime);
+    }
+  }
+
+  private initializeNumberOfProofsInput(): void {
+    const options = this.walletService.getOptions();
+    if (typeof options.numberOfProofs === 'number') {
+      this.useCustomNumberOfProofs.set(true);
+      this.numberOfProofsInput.set(options.numberOfProofs.toString());
     }
   }
 
@@ -107,13 +102,10 @@ export class HolderKeysCardComponent implements OnInit {
     window.open(this.ephemeralKeysUrl, '_blank');
   }
 
-  // Wallet Options Methods
+  // ...existing code...
+
   onPayloadEncryptionChange(value: boolean): void {
     this.walletService.updatePayloadEncryptionPreference(value);
-    this.walletOptions.update(options => ({
-      ...options,
-      payloadEncryptionPreference: value
-    }));
   }
 
   onNumberOfProofsToggle(useCustom: boolean): void {
@@ -121,10 +113,6 @@ export class HolderKeysCardComponent implements OnInit {
     if (!useCustom) {
       this.numberOfProofsInput.set('');
       this.walletService.updateNumberOfProofs(false);
-      this.walletOptions.update(options => ({
-        ...options,
-        numberOfProofs: false
-      }));
     }
   }
 
@@ -133,10 +121,6 @@ export class HolderKeysCardComponent implements OnInit {
     const numValue = parseInt(value, 10);
     if (!isNaN(numValue) && numValue > 0) {
       this.walletService.updateNumberOfProofs(numValue);
-      this.walletOptions.update(options => ({
-        ...options,
-        numberOfProofs: numValue
-      }));
     }
   }
 
@@ -146,12 +130,7 @@ export class HolderKeysCardComponent implements OnInit {
   }
 
   onUseSignedMetadataChange(value: boolean): void {
-    this.useSignedMetadata.set(value);
     this.walletService.updateUseSignedMetadata(value);
-    this.walletOptions.update(options => ({
-      ...options,
-      useSignedMetadata: value
-    }));
   }
 
   copyCredentialToClipboard(sdJwt: string, credentialType: string): void {
