@@ -4,12 +4,27 @@
   gap: 8px;
 }
 
+[matListItemTitle] {
+  flex: 1; /* pousse l’icône à droite */
+}
+
+.help-icon {
+  font-size: 18px;
+  color: gray;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
 .icon {
   flex-shrink: 0;
 }
 
 .icon--pending {
   color: gray;
+}
+
+.icon--optional {
+  color: orange;
 }
 
 .icon--valid {
@@ -22,4 +37,10 @@
 
 .text {
   flex: 1;
+}
+
+.help-icon {
+  font-size: 18px;
+  color: gray;
+  cursor: pointer;
 }

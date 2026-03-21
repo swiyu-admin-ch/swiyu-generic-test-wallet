@@ -9,9 +9,10 @@ import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { FormsModule } from '@angular/forms';
 import { HolderKeyService } from '@services/holder-key.service';
-import { WalletOptionsService, WalletOptions } from '@services/wallet-options.service';
 import { VcStoreService } from '@services/vc-store.service';
 import { WritableSignal, signal } from '@angular/core';
+import { WalletService } from '@app/services/wallet-service';
+import { WalletOptions } from '@app/models/wallet-options';
 
 @Component({
   selector: 'app-holder-keys-card',
@@ -31,7 +32,7 @@ import { WritableSignal, signal } from '@angular/core';
 })
 export class HolderKeysCardComponent implements OnInit {
   private holderKeyService = inject(HolderKeyService);
-  private walletOptionsService = inject(WalletOptionsService);
+  private walletService = inject(WalletService);
   private vcStoreService = inject(VcStoreService);
 
   holderKeyGeneratedAt: WritableSignal<Date | null> = signal(null);
@@ -108,7 +109,7 @@ export class HolderKeysCardComponent implements OnInit {
 
   // Wallet Options Methods
   onPayloadEncryptionChange(value: boolean): void {
-    this.walletOptionsService.updatePayloadEncryptionPreference(value);
+    this.walletService.updatePayloadEncryptionPreference(value);
     this.walletOptions.update(options => ({
       ...options,
       payloadEncryptionPreference: value
@@ -119,7 +120,7 @@ export class HolderKeysCardComponent implements OnInit {
     this.useCustomNumberOfProofs.set(useCustom);
     if (!useCustom) {
       this.numberOfProofsInput.set('');
-      this.walletOptionsService.updateNumberOfProofs(false);
+      this.walletService.updateNumberOfProofs(false);
       this.walletOptions.update(options => ({
         ...options,
         numberOfProofs: false
@@ -131,7 +132,7 @@ export class HolderKeysCardComponent implements OnInit {
     this.numberOfProofsInput.set(value);
     const numValue = parseInt(value, 10);
     if (!isNaN(numValue) && numValue > 0) {
-      this.walletOptionsService.updateNumberOfProofs(numValue);
+      this.walletService.updateNumberOfProofs(numValue);
       this.walletOptions.update(options => ({
         ...options,
         numberOfProofs: numValue
@@ -146,7 +147,7 @@ export class HolderKeysCardComponent implements OnInit {
 
   onUseSignedMetadataChange(value: boolean): void {
     this.useSignedMetadata.set(value);
-    this.walletOptionsService.updateUseSignedMetadata(value);
+    this.walletService.updateUseSignedMetadata(value);
     this.walletOptions.update(options => ({
       ...options,
       useSignedMetadata: value

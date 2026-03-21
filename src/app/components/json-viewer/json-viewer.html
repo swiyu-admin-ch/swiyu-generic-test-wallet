@@ -1,7 +1,13 @@
 @if (data()) {
   <div class="json-container">
 
-    <pre>{{ data() | json }}</pre>
+    @if (title()) {
+      <div class="json-title">
+        {{ title() }}
+      </div>
+    }
+
+    <pre>{{ displayedJson }}</pre>
 
     <button
       mat-icon-button

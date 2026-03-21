@@ -57,11 +57,11 @@ app-header {
 .panel-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding: 16px;
-  border-bottom: 1px solid #e0e0e0;
   background-color: #fafafa;
   flex-shrink: 0;
+  text-align: right;
 }
 
 .panel-header h2 {

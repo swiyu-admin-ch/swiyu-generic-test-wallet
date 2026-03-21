@@ -30,16 +30,20 @@ export class HolderKeyService {
     this.currentKeyId = `key_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  getPrivateKey(): CryptoKey | null {
-    return this.privateKey;
+  getPrivateKey(): CryptoKey {
+    if(this.privateKey) 
+      return this.privateKey;
+    throw new Error("getPrivateKey");
   }
 
   getPublicKey(): CryptoKey | null {
     return this.publicKey;
   }
 
-  getJwk(): JWK | null {
-    return this.jwk;
+  getJwk(): JWK {
+    if (this.jwk)
+      return this.jwk;
+    throw new Error("getJwk")
   }
 
   getKeyGeneratedAt(): Date | null {

@@ -19,15 +19,15 @@ import {
 } from "@app/models/api-response";
 import { RequestObject } from "src/generated/verifier";
 import { JWKS } from "@models/jwks"
-import { WalletOptionsService } from "@services/wallet-options.service";
 import { MetadataSignatureTrackingService } from "@services/metadata-signature-tracking.service";
+import { WalletService } from "./services/wallet-service";
 
 @Injectable({
   providedIn: "root",
 })
 export class ApiService {
   private http = inject(HttpClient);
-  private walletOptionsService = inject(WalletOptionsService);
+  private walletService = inject(WalletService);
   private metadataSignatureTrackingService = inject(MetadataSignatureTrackingService);
   private ephemeralPrivateKey?: CryptoKey;
 
@@ -38,7 +38,7 @@ export class ApiService {
   public resolveOpenIdMetadataFromDeeplink(
     issuerCredentialUrl: string
   ): Observable<OpenIdMetadataResponse> {
-    const walletOptions = this.walletOptionsService.getOptions();
+    const walletOptions = this.walletService.getOptions();
     const useSignedMetadata = walletOptions.useSignedMetadata;
 
     if (useSignedMetadata) {
@@ -86,7 +86,7 @@ export class ApiService {
       return throwError(() => new Error("No issuer_credential_url provided"));
     }
 
-    const walletOptions = this.walletOptionsService.getOptions();
+    const walletOptions = this.walletService.getOptions();
     const useSignedMetadata = walletOptions.useSignedMetadata;
 
     if (useSignedMetadata) {

@@ -8,9 +8,9 @@ import { JwtPayload, RegistryEntry } from "@app/models/api-response";
 })
 export class VerificationService {
 
-    public decodeDeeplink(url: string): Record<string, string> | null {
+    public decodeDeeplink(url: string): Record<string, string> {
         if (!url) {
-            return null;
+                    throw new Error("decode")
         }
 
         if (url.startsWith('swiyu-verify://')) {
@@ -27,7 +27,7 @@ export class VerificationService {
             return result;
         }
 
-        return null;
+        throw new Error("decode")
     }
 
 
@@ -56,12 +56,12 @@ export class VerificationService {
 
     public async decodeResponse(jwt: string, registryEntry: RegistryEntry[]): Promise<{ payload: JwtPayload, protectedHeader: JwtPayload }> {
 
-        const kid = (jose.decodeProtectedHeader(jwt) as JwtPayload).kid;
-        const verificationMethods = (registryEntry[3] as Record<string, unknown>)?.value as Record<string, unknown>;
-        const verificationMethod = ((verificationMethods?.verificationMethod as Record<string, unknown>[]) || [])
-            .map(meth => (meth as Record<string, unknown>).id === kid ? meth : null)
+        const kid = (jose.decodeProtectedHeader(jwt) as JwtPayload)['kid'];
+        const verificationMethods = (registryEntry[3] as Record<string, unknown>)?.['value'] as Record<string, unknown>;
+        const verificationMethod = ((verificationMethods?.['verificationMethod'] as Record<string, unknown>[]) || [])
+            .map(meth => (meth as Record<string, unknown>)['id'] === kid ? meth : null)
             .filter((meth: Record<string, unknown> | null): meth is Record<string, unknown> => meth != null)[0];
-        const jwk = verificationMethod?.publicKeyJwk as CryptoKey;
+        const jwk = verificationMethod?.['publicKeyJwk'] as CryptoKey;
         const { payload, protectedHeader } = await jose.jwtVerify(jwt, jwk, {})
 
         return { payload: payload as JwtPayload, protectedHeader: protectedHeader as JwtPayload };

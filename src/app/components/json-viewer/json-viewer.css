@@ -16,3 +16,12 @@ pre {
   margin: 0;
   overflow: auto;
 }
+
+.json-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: #666;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}

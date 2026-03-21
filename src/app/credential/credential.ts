@@ -33,8 +33,8 @@ import { ToastService } from "@app/services/toast.service";
   styleUrl: "./credential.css",
 })
 export class Credential implements OnChanges {
-  @Input({ required: true }) encodedCredential: string;
-  @Input({ required: true }) registryEntry: RegistryEntry[];
+  @Input({ required: true }) encodedCredential: string | undefined;
+  @Input({ required: true }) registryEntry: RegistryEntry[] | undefined;
   @Output() credentialChange = new EventEmitter<string>();
 
   private router = inject(Router);
@@ -60,20 +60,20 @@ export class Credential implements OnChanges {
 
       if (this.registryEntry && this.registryEntry.length > 0) {
         const registryValue = this.registryEntry[3] as Record<string, unknown>;
-        const verificationMethods = (registryValue?.value as Record<string, unknown>)?.verificationMethod as Record<string, unknown>[];
+        const verificationMethods = (registryValue?.["value"] as Record<string, unknown>)?.["verificationMethod"] as Record<string, unknown>[];
 
         if (verificationMethods && verificationMethods.length > 0) {
           const verificationMethod =
             verificationMethods
               .map((verificationMethod: Record<string, unknown>) =>
-                verificationMethod.id === decodedHeader.kid
+                verificationMethod["id"] === decodedHeader["kid"]
                   ? verificationMethod
                   : null
               )
               .filter((verificationMethod: Record<string, unknown> | null): verificationMethod is Record<string, unknown> => verificationMethod != null)[0];
 
           if (verificationMethod) {
-            const jwk = verificationMethod?.publicKeyJwk;
+            const jwk = verificationMethod?.["publicKeyJwk"];
             const { payload, protectedHeader } = await jose.jwtVerify(token[0], jwk as CryptoKey);
             this.decodedHeader.set(protectedHeader as JwtPayload);
             this.decodedPayload.set(payload as JwtPayload);

@@ -1,6 +1,6 @@
 import { OpenIdIssuerMetadata } from "./open-id-issuer-metadata";
 
-export type OpenIdMetadataResponse = OpenIdIssuerMetadata;
+export type OpenIdMetadataResponse = OpenIdIssuerMetadata | any;
 
 export type OpenIdConfigResponse = Record<string, unknown>;
 

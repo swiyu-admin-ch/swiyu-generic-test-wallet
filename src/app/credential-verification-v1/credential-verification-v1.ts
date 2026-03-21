@@ -75,8 +75,8 @@ export class CredentialVerificationV1 {
 
   constructor() {
     const navigation = this.router.getCurrentNavigation();
-    if (navigation?.extras?.state?.credential) {
-      this.credentialInput.set(navigation.extras.state.credential);
+    if (navigation?.extras?.state?.["credential"]) {
+      this.credentialInput.set(navigation.extras.state["credential"]);
     }
   }
 
@@ -103,7 +103,7 @@ export class CredentialVerificationV1 {
     }
 
     this.apiService
-      .resolveRequestObjectFromDeeplink(decodedDeeplink?.request_uri as string)
+      .resolveRequestObjectFromDeeplink(decodedDeeplink?.["request_uri"] as string)
       .pipe(
         switchMap((requestObject: JwtPayload) => {
           const reqObj = requestObject as unknown as RequestObject;

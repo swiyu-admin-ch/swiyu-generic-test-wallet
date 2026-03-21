@@ -20,7 +20,7 @@ import {MatInput, MatInputModule} from "@angular/material/input";
 })
 export class DeeplinkInput {
     @Input() inputSignal: WritableSignal<string> = signal('');
-    @Input() label: string;
+    @Input() label: string | undefined;
     @Output() submitEvent = new EventEmitter<string>();
     @Output() resetEvent = new EventEmitter();
 

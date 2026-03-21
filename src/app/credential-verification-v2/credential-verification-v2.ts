@@ -74,9 +74,9 @@ export class CredentialVerificationV2 {
   constructor(
   ) {
     const navigation = this.router.getCurrentNavigation();
-    if (navigation?.extras?.state?.credential) {
-      this.credentialInput.set(navigation.extras.state.credential);
-    }
+    // if (navigation?.extras?.state?.credential) {
+    //   this.credentialInput.set(navigation.extras.state.credential);
+    // }
   }
 
   public onClear(): void {
@@ -96,17 +96,15 @@ export class CredentialVerificationV2 {
     this.deeplink.set(decodedDeeplink);
 
     this.apiService
-      .resolveRequestObjectFromDeeplink(decodedDeeplink?.request_uri)
+      .resolveRequestObjectFromDeeplink(decodedDeeplink?.["request_uri"])
       .pipe(
         switchMap((requestObject: JwtPayload) => {
           const reqObj = requestObject as unknown as RequestObject;
           this.requestObject.set(reqObj);
           this.dcqlQuery.set(reqObj?.dcql_query);
-          this.encryptionRequired.set(requestObject?.response_mode === 'direct_post.jwt');
+          this.encryptionRequired.set(requestObject?.["response_mode"] === 'direct_post.jwt');
 
-          const requiredCredentials = this.verificationService.extractCredentialsFromDCQL(
-            reqObj?.dcql_query
-          );
+          const requiredCredentials = this.verificationService.extractCredentialsFromDCQL(reqObj?.dcql_query as DcqlQueryDto);
           this.requiredCredentials.set(requiredCredentials);
 
           const credentialString = this.credentialInput();
@@ -401,7 +399,7 @@ export class CredentialVerificationV2 {
         return false;
       }
 
-      return !(payloadJson._sd && Array.isArray(payloadJson._sd) && payloadJson._sd.length > 0);
+      return !(payloadJson["_sd"] && Array.isArray(payloadJson["_sd"]) && payloadJson["_sd"].length > 0);
     });
 
     if (missingFields.length > 0) {

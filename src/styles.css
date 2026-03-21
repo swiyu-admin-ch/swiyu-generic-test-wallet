@@ -1,29 +1,18 @@
-body {
-    font-family: Arial, Helvetica, sans-serif;
-    margin: 0;
-    padding: 0;
-}
-
 html, body {
+    font-family: Arial, Helvetica, sans-serif;
     height: 100%;
     margin: 0;
     padding: 0;
 }
 
-h1 {
-    color: #2c3e50;
+mat-card, mat-expansion-panel {
+    box-shadow: none !important;
+    border: 1px solid #e0e0e0 !important;
 }
 
 mat-card {
-  margin-bottom: 12px;
-  padding: 12px;
-  box-shadow: none !important;
-  border: 1px solid #e0e0e0 !important;
-}
-
-mat-expansion-panel {
-  box-shadow: none !important;
-  border: 1px solid #e0e0e0 !important;
+    padding: 12px;
+    margin-bottom: 12px;
 }
 
 mat-card-title {
@@ -31,14 +20,14 @@ mat-card-title {
 }
 
 .container {
-    margin: 25px;
+    margin: 24px;
 }
 
 .actions {
-    margin: 20px 0;
+    margin: 24px 0;
 
     > button {
-       margin-right: 10px;
+       margin-right: 8px;
     }
 }
 

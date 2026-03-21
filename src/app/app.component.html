@@ -22,12 +22,6 @@
   </div>
 
   <div class="wallet-info-panel" [class.open]="isWalletInfoDrawerOpen()">
-    <div class="panel-header">
-      <h2>Wallet Information</h2>
-      <button mat-icon-button (click)="closeDrawer()" class="close-button">
-        <mat-icon>close</mat-icon>
-      </button>
-    </div>
     <div class="panel-content">
       <app-holder-keys-card></app-holder-keys-card>
     </div>

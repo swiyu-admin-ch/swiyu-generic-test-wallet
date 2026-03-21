@@ -6,7 +6,9 @@
     "ng": "ng",
     "start": "ng serve --proxy-config proxy.conf.json",
     "build": "ng build --configuration production",
-    "test": "ng test --watch=false",
+    "test": "ng test --no-watch",
+    "test:watch": "ng test",
+    "test:coverage": "ng test --coverage",
     "lint": "ng lint",
     "generate:apis": "npm run generate:issuer-api && npm run generate:verifier-api",
     "generate:issuer-api": "openapi-generator-cli generate -i openapi-spec/issuer-api.yaml -g typescript-angular -o src/generated/issuer --additional-properties=providedInRoot=true --skip-validate-spec",
@@ -18,7 +20,6 @@
     "@angular/cdk": "^21.2.0",
     "@angular/common": "^21.2.4",
     "@angular/compiler": "^21.2.0",
-    "@angular/core": "^21.2.4",
     "@angular/forms": "^21.2.0",
     "@angular/material": "^21.2.0",
     "@angular/platform-browser": "^21.2.0",
@@ -35,11 +36,16 @@
     "@angular/build": "^21.2.0",
     "@angular/cli": "^21.2.0",
     "@angular/compiler-cli": "^21.2.0",
+    "@angular/core": "^21.2.5",
     "@openapitools/openapi-generator-cli": "^2.30.0",
-    "@types/jest": "^30.0.0",
+    "@types/node": "^25.5.0",
+    "@vitest/browser": "^4.1.0",
+    "@vitest/ui": "^4.1.0",
     "angular-eslint": "21.2.0",
     "eslint": "^9.39.1",
+    "jsdom": "^29.0.1",
     "typescript": "^5.9.3",
-    "typescript-eslint": "8.46.4"
+    "typescript-eslint": "8.46.4",
+    "vitest": "^4.1.0"
   }
 }
