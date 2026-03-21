@@ -1,23 +1,23 @@
 import { Component, inject, signal, WritableSignal } from "@angular/core";
-import { Credential } from "../credential/credential";
+import { Credential } from "@app/components/credential-input/credential-input.component";
 import { FormsModule } from "@angular/forms";
 import { EMPTY, from, of, switchMap } from "rxjs";
-import { PanelComponent } from "../deeplink-resolver/panel.component";
-import { ChecklistEntry } from "../checklist-entry/checklist-entry";
+import { ValidationPanelComponent } from "@components/validation-panel/validation-panel.component";
+import { ValidationItemComponent } from "@components/validation-item/validation-item.component";
 import { MatList } from "@angular/material/list";
 import { MatAccordion } from "@angular/material/expansion";
 import { JsonPipe, KeyValuePipe } from "@angular/common";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
 import { DeeplinkService } from "@services/deeplink.service";
-import { DeeplinkInput } from "../deeplink-input/deeplink-input";
+import { DeeplinkInput } from "../../components/deeplink-input/deeplink-input.component";
 import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { SdJwtStoreService } from "@services/sd-jwt-store.service";
 import { MetadataSignatureTrackingService } from "@services/metadata-signature-tracking.service";
 import { IssuerCredentialRequestEncryption, IssuerCredentialResponseEncryption, NonceResponse, OAuthToken } from "src/generated/issuer";
 import { JwtPayload, OpenIdMetadataResponse, RegistryEntry, OpenIdConfigResponse, CredentialResponse } from "@app/models/api-response";
-import { JsonViewer } from "@components/json-viewer/json-viewer";
-import { HolderKeysCardComponent } from "../components/holder-keys-card/holder-keys-card.component";
+import { DataViewerComponent } from "@app/components/data-viewer/data-viewer.component";
+import { HolderKeysCardComponent } from "@components/holder/holder.component";
 import { catchError, tap } from 'rxjs/operators';
 import { OIDVCIService } from "@app/services/oidvci-service";
 import { CredentialOffer } from "@app/models/credential-offer";
@@ -33,8 +33,8 @@ import * as jose from "jose";
     MatCardTitle,
     MatCardContent,
     Credential,
-    PanelComponent,
-    ChecklistEntry,
+    ValidationPanelComponent,
+    ValidationItemComponent,
     JsonPipe,
     MatList,
     MatAccordion,
@@ -43,7 +43,7 @@ import * as jose from "jose";
     MatFormFieldModule,
     DeeplinkInput,
     HolderKeysCardComponent,
-    JsonViewer,
+    DataViewerComponent,
     KeyValuePipe,
   ],
   templateUrl: "./credential-issuance.html",

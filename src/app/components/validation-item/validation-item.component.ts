@@ -5,14 +5,13 @@ import { MatTooltip } from '@angular/material/tooltip';
 import { NgClass } from '@angular/common';
 
 @Component({
-  selector: 'app-checklist-entry',
+  selector: 'app-validation-item',
   standalone: true,
   imports: [MatIcon, MatTooltip, MatListItem, NgClass],
-  templateUrl: './checklist-entry.html',
-  styleUrl: './checklist-entry.css'
+  templateUrl: './validation-item.component.html',
+  styleUrl: './validation-item.component.css'
 })
-export class ChecklistEntry {
-
+export class ValidationItemComponent {
   data: InputSignal<unknown> = input.required();
   validData: InputSignal<boolean> = input.required();
   text: InputSignal<string> = input.required();
@@ -24,11 +23,10 @@ export class ChecklistEntry {
   });
 
   iconClass = computed(() => {
-  if (!this.data()) return 'icon--pending';
+    if (!this.data()) return 'icon--pending';
 
-  if (this.validData()) return 'icon--valid';
+    if (this.validData()) return 'icon--valid';
 
-  return this.optional() !== null ? 'icon--optional' : 'icon--invalid';
-});
-
+    return this.optional() !== null ? 'icon--optional' : 'icon--invalid';
+  });
 }

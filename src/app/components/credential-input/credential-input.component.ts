@@ -19,7 +19,7 @@ import { JwtPayload, RegistryEntry } from "@app/models/api-response";
 import { ToastService } from "@app/services/toast.service";
 
 @Component({
-  selector: "app-credential",
+  selector: "app-credential-input",
   standalone: true,
   imports: [
     MatFormField,
@@ -29,8 +29,8 @@ import { ToastService } from "@app/services/toast.service";
     MatButton,
     MatLabel
   ],
-  templateUrl: "./credential.html",
-  styleUrl: "./credential.css",
+  templateUrl: "./credential-input.component.html",
+  styleUrl: "./credential-input.component.css",
 })
 export class Credential implements OnChanges {
   @Input({ required: true }) encodedCredential: string | undefined;

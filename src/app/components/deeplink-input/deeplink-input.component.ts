@@ -15,7 +15,7 @@ import {MatInput, MatInputModule} from "@angular/material/input";
         MatFormFieldModule,
         MatInputModule,
     ],
-    templateUrl: './deeplink-input.html',
+    templateUrl: './deeplink-input.component.html',
     standalone: true
 })
 export class DeeplinkInput {

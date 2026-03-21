@@ -5,14 +5,14 @@ import { MatIcon } from "@angular/material/icon";
 import { WritableSignal } from '@angular/core';
 
 @Component({
-    selector: 'app-metadata-panel',
-    templateUrl: './panel.component.html',
-    styleUrl: './panel.component.css',
+    selector: 'app-validation-panel',
+    templateUrl: './validation-panel.component.html',
+    styleUrl: './validation-panel.component.css',
     standalone: true,
     imports: [CommonModule, MatExpansionModule, MatIcon],
     changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class PanelComponent {
+export class ValidationPanelComponent {
     @Input() panelOpenState: WritableSignal<boolean> | undefined;
     @Input() panelTitle: string | undefined;
     @Input() data: Record<string, unknown> | undefined = undefined;

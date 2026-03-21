@@ -1,0 +1,21 @@
+<mat-list-item class="validation-item">
+
+  <mat-icon matListItemIcon
+    [fontIcon]="icon()"
+    [ngClass]="iconClass()">
+  </mat-icon>
+
+  <span matListItemTitle>
+    {{ text() }}
+  </span>
+
+  @if (optional()) {
+  <span matListItemMeta>
+    <mat-icon fontIcon="help_outline"
+      [matTooltip]="optional()!"
+      matTooltipPosition="left">
+    </mat-icon>
+  </span>
+  }
+
+</mat-list-item>

@@ -1,16 +1,16 @@
 import { Component, inject, signal, WritableSignal } from "@angular/core";
 import { SignJWT } from "jose";
-import { ApiService } from "../api-service";
+import { ApiService } from "@services/api-service";
 import { FormsModule } from "@angular/forms";
 import { from, of, switchMap } from "rxjs";
-import { PanelComponent } from "../deeplink-resolver/panel.component";
-import { ChecklistEntry } from "../checklist-entry/checklist-entry";
+import { ValidationPanelComponent } from "@components/validation-panel/validation-panel.component";
+import { ValidationItemComponent } from "@components/validation-item/validation-item.component";
 import { MatList } from "@angular/material/list";
 import { MatAccordion } from "@angular/material/expansion";
 import { JsonPipe, CommonModule } from "@angular/common";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
-import { DeeplinkInput } from "../deeplink-input/deeplink-input";
+import { DeeplinkInput } from "../../components/deeplink-input/deeplink-input.component";
 import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { VerificationService } from "@services/verification.service";
 import { HolderKeyService } from "@services/holder-key.service";
@@ -19,13 +19,13 @@ import { SdJwtStoreService } from "@services/sd-jwt-store.service";
 import { Router } from "@angular/router";
 import { DcqlClaimDto, DcqlCredentialDto, DcqlQueryDto, RequestObject } from "src/generated/verifier";
 import { JwtPayload } from "@app/models/api-response";
-import { JsonViewer } from "@components/json-viewer/json-viewer";
+import { DataViewerComponent } from "@app/components/data-viewer/data-viewer.component";
 
 @Component({
   selector: "app-credential-verification-v2",
   imports: [
-    PanelComponent,
-    ChecklistEntry,
+    ValidationPanelComponent,
+    ValidationItemComponent,
     MatList,
     MatAccordion,
     JsonPipe,
@@ -37,7 +37,7 @@ import { JsonViewer } from "@components/json-viewer/json-viewer";
     MatCard,
     MatCardTitle,
     MatCardContent,
-    JsonViewer,
+    DataViewerComponent,
   ],
   templateUrl: "./credential-verification-v2.html",
   standalone: true,

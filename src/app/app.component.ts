@@ -6,7 +6,7 @@ import { MatTabLink, MatTabNav, MatTabNavPanel } from "@angular/material/tabs";
 import { MatIconModule } from "@angular/material/icon";
 import { routes } from "../routes";
 import { HeaderComponent } from "@components/header/header.component";
-import { HolderKeysCardComponent } from "@components/holder-keys-card/holder-keys-card.component";
+import { HolderKeysCardComponent } from "@components/holder/holder.component";
 import { CommonModule } from '@angular/common';
 import { DrawerService } from "@services/drawer.service";
 

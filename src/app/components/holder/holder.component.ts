@@ -11,9 +11,10 @@ import { FormsModule } from '@angular/forms';
 import { HolderKeyService } from '@services/holder-key.service';
 import { WalletService } from '@services/wallet-service';
 import { signal, WritableSignal } from '@angular/core';
+import { ToastService } from '@app/services/toast.service';
 
 @Component({
-  selector: 'app-holder-keys-card',
+  selector: 'app-holder',
   standalone: true,
   imports: [
     CommonModule,
@@ -26,9 +27,10 @@ import { signal, WritableSignal } from '@angular/core';
     MatFormFieldModule,
     FormsModule
   ],
-  templateUrl: './holder-keys-card.component.html'
+  templateUrl: './holder.component.html'
 })
 export class HolderKeysCardComponent implements OnInit {
+  private toastService = inject(ToastService);
   private holderKeyService = inject(HolderKeyService);
   private walletService = inject(WalletService);
 
@@ -102,8 +104,6 @@ export class HolderKeysCardComponent implements OnInit {
     window.open(this.ephemeralKeysUrl, '_blank');
   }
 
-  // ...existing code...
-
   onPayloadEncryptionChange(value: boolean): void {
     this.walletService.updatePayloadEncryptionPreference(value);
   }
@@ -135,9 +135,9 @@ export class HolderKeysCardComponent implements OnInit {
 
   copyCredentialToClipboard(sdJwt: string, credentialType: string): void {
     navigator.clipboard.writeText(sdJwt).then(() => {
-      console.log(`Credential "${credentialType}" copied to clipboard`);
+      this.toastService.showSuccess(`Credential (${credentialType}) copied to clipboard`);
     }).catch(err => {
-      console.error('Failed to copy credential to clipboard:', err);
+      this.toastService.showError('Failed to copy credential to clipboard:', err);
     });
   }
 }

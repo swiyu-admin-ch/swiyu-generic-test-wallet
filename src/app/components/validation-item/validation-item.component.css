@@ -1,11 +1,11 @@
-.checklist-entry {
+.validation-item {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 [matListItemTitle] {
-  flex: 1; /* pousse l’icône à droite */
+  flex: 1;
 }
 
 .help-icon {

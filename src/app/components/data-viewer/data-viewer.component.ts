@@ -5,13 +5,13 @@ import { JsonPipe } from '@angular/common';
 import { ToastService } from '@app/services/toast.service';
 
 @Component({
-  selector: 'app-json-viewer',
+  selector: 'app-data-viewer',
   standalone: true,
   imports: [MatIcon, MatIconButton, JsonPipe],
-  templateUrl: './json-viewer.html',
-  styleUrl: './json-viewer.css'
+  templateUrl: './data-viewer.component.html',
+  styleUrl: './data-viewer.component.css'
 })
-export class JsonViewer {
+export class DataViewerComponent {
   private toastService = inject(ToastService);
   
   data: InputSignal<unknown> = input.required();

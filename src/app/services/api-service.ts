@@ -20,7 +20,7 @@ import {
 import { RequestObject } from "src/generated/verifier";
 import { JWKS } from "@models/jwks"
 import { MetadataSignatureTrackingService } from "@services/metadata-signature-tracking.service";
-import { WalletService } from "./services/wallet-service";
+import { WalletService } from "@services/wallet-service";
 
 @Injectable({
   providedIn: "root",
