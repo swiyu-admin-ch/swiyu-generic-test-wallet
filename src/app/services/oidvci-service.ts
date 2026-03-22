@@ -3,7 +3,6 @@ import { inject, Injectable } from '@angular/core';
 import { OpenIdConfigResponse, OpenIdMetadataResponse, RegistryEntry } from '@app/models/api-response';
 import { Observable } from 'rxjs';
 import { CredentialEndpointResponse } from 'src/generated/issuer';
-import { CredentialEndpointRequest } from 'src/generated/issuer/model/credentialEndpointRequest';
 import { NonceResponse } from 'src/generated/issuer/model/nonceResponse';
 import { OAuthToken } from 'src/generated/issuer/model/oAuthToken';
 
@@ -109,7 +108,7 @@ export class OIDVCIService {
 
   fetchCredential(
     credentialEndpointUrl: string,
-    payload: CredentialEndpointRequest | string, 
+    payload: any | string, 
     bearerToken: string
   ): Observable<CredentialEndpointResponse | string> {
     const encrypted = typeof payload === 'string'
