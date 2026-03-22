@@ -1,0 +1,32 @@
+<mat-expansion-panel (closed)="panelOpenState?.set(false)"
+    (opened)="panelOpenState?.set(true)">
+    <mat-expansion-panel-header>
+        <mat-panel-title>
+            <mat-icon [fontIcon]="errorMessage ? 'error' : (data === undefined ? 'circle' : 'check_circle')"
+                [ngStyle]="{ 'color': errorMessage ? 'red' : (data === undefined ? 'gray' : 'green') }"
+                class="panel-icon"
+                aria-hidden="false">
+            </mat-icon>
+            {{ panelTitle }}
+        </mat-panel-title>
+    </mat-expansion-panel-header>
+
+    @if (errorMessage) {
+        <div class="error-message-panel">
+            @if (isObject(errorMessage)) {
+                <div class="error-block">
+                    <div><strong>Request</strong> {{ errorMessage?.['request'] }}</div>
+                    <div><strong>Status</strong> {{ errorMessage?.['status'] }}</div>
+                    @if (errorMessage?.['response']) {
+                        <div><strong>Response</strong></div>
+                        <pre>{{ errorMessage?.['response'] | json }}</pre>
+                    }
+                    <div class="hint">{{ errorMessage?.['hint'] }}</div>
+                </div>
+            } @else {
+                <pre>{{ errorMessage }}</pre>
+            }
+        </div>
+    }
+    <ng-content></ng-content>
+</mat-expansion-panel>

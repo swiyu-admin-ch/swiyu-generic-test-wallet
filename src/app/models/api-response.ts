@@ -1,6 +1,6 @@
 import { OpenIdIssuerMetadata } from "./open-id-issuer-metadata";
 
-export type OpenIdMetadataResponse = OpenIdIssuerMetadata;
+export type OpenIdMetadataResponse = OpenIdIssuerMetadata | any;
 
 export type OpenIdConfigResponse = Record<string, unknown>;
 
@@ -13,4 +13,3 @@ export type RegistryEntry = Record<number, unknown>;
 export type PresentationSubmission = Record<string, unknown>;
 
 export type VpTokenMap = Record<string, string[]>;
-

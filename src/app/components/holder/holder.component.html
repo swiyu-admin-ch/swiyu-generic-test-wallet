@@ -1,0 +1,133 @@
+<mat-card appearance="outlined">
+  <mat-card-title>
+    <h5>Wallet</h5>
+  </mat-card-title>
+  <mat-card-content>
+    <div style="margin-bottom: 16px;">
+      <h4 style="font-size: 12px; text-transform: uppercase; color: #666;">
+        Holder Keys
+        <button
+          mat-icon-button
+          (click)="openEphemeralKeysInfo($event)"
+          matTooltip="This is the cryptographic key that proves you are the owner of requested credentials. It is ephemeral and regenerated on page refresh."
+          matTooltipPosition="above"
+          style="width: 20px; height: 20px; line-height: 20px; margin-left: 4px;">
+          <mat-icon style="font-size: 14px; width: 14px; height: 14px; ">info</mat-icon>
+        </button>
+      </h4>
+
+      <p style="margin: 4px 0; font-size: 13px;">
+        <strong>Generated:</strong> {{ formatDate(holderKeyGeneratedAt()) }}
+      </p>
+      <p style="margin: 4px 0; font-size: 13px;">
+        <strong>Key ID:</strong> <code style="background: #f5f5f5; padding: 2px 4px; border-radius: 2px; font-size: 11px;">{{ getCurrentKeyId() }}</code>
+      </p>
+    </div>
+
+    <div>
+      <h4 style="margin: 0 0 12px 0; font-size: 12px; text-transform: uppercase; color: #666;">
+        Options
+      </h4>
+
+      <div style="margin-bottom: 12px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <span style="font-size: 13px; margin: 0;">Use Signed Metadata</span>
+            <mat-icon matTooltip="Use signed metadata instead of unsigned metadata"
+              matTooltipPosition="above"
+              style="font-size: 14px; width: 14px; height: 14px; ">info</mat-icon>
+          </div>
+          <mat-slide-toggle [checked]="walletOptions().useSignedMetadata"
+            (change)="onUseSignedMetadataChange($event.checked)"
+            style="margin: 0;">
+          </mat-slide-toggle>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 12px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <span style="font-size: 13px; margin: 0;">Payload Encryption Preference</span>
+            <mat-icon matTooltip="Prefer payload encryption even if not enforced"
+              matTooltipPosition="above"
+              style="font-size: 14px; width: 14px; height: 14px; ">info</mat-icon>
+          </div>
+          <mat-slide-toggle [checked]="walletOptions().payloadEncryptionPreference"
+            (change)="onPayloadEncryptionChange($event.checked)"
+            style="margin: 0;">
+          </mat-slide-toggle>
+        </div>
+      </div>
+
+      <div style="display:none">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <span style="font-size: 13px; margin: 0;">Custom Number of Proofs</span>
+            <mat-icon
+              matTooltip="Use a custom number of proofs instead of batch size from metadata"
+              matTooltipPosition="above"
+              style="font-size: 14px; width: 14px; height: 14px; ">info</mat-icon>
+          </div>
+          <mat-slide-toggle
+            [checked]="useCustomNumberOfProofs()"
+            (change)="onNumberOfProofsToggle($event.checked)"
+            style="margin: 0;">
+          </mat-slide-toggle>
+        </div>
+
+        @if (useCustomNumberOfProofs()) {
+        <mat-form-field appearance="outline" style="width: 100%; font-size: 13px;">
+          <mat-label>Number of Proofs</mat-label>
+          <input
+            matInput
+            type="number"
+            min="1"
+            [value]="numberOfProofsInput()"
+            (input)="onNumberOfProofsInput($event)"
+            placeholder="Enter number of proofs" />
+        </mat-form-field>
+        }
+      </div>
+    </div>
+
+    <hr style="margin: 12px 0; border: none; " />
+
+    <div>
+      <h4 style="margin: 0 0 12px 0; font-size: 12px; text-transform: uppercase; color: #666;">
+        Credentials
+      </h4>
+
+      @if (requestedVCs().length > 0) {
+      <div style="font-size: 13px;">
+        <p style="margin: 0 0 8px 0;">
+          <strong>Total:</strong> {{ requestedVCs().length }} credential(s)
+        </p>
+        <div style="max-height: 200px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 2px; padding: 8px;">
+          @for (vc of requestedVCs(); track vc.id) {
+          <div 
+            tabindex="0"
+            (click)="copyCredentialToClipboard(vc.sdJwt, vc.credentialType)"
+            (keydown.enter)="copyCredentialToClipboard(vc.sdJwt, vc.credentialType)"
+            style="margin-bottom: 8px; padding: 8px; border-bottom: 1px solid #f0f0f0; cursor: pointer; border-radius: 2px; transition: background-color 0.2s ease;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <p style="margin: 0; font-size: 12px; flex: 1;">
+                <strong>{{ vc.credentialType }}</strong>
+              </p>
+              <mat-icon
+                style="font-size: 12px; width: 12px; height: 12px; color: #999; margin-left: 4px;">content_copy</mat-icon>
+            </div>
+            <p style="margin: 4px 0 0 0; font-size: 11px; color: #999;">
+              {{ formatDate(vc.issuedAt) }}
+            </p>
+          </div>
+          }
+        </div>
+      </div>
+      } @else {
+      <p style="margin: 0; font-size: 13px; color: #999;">
+        No credentials requested yet
+      </p>
+      }
+    </div>
+  </mat-card-content>
+</mat-card>

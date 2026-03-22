@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
-import { CredentialIssuance } from "@app/credential-issuance/credential-issuance";
-import { CredentialVerificationV1 } from "@app/credential-verification-v1/credential-verification-v1";
-import { CredentialVerificationV2 } from '@app/credential-verification-v2/credential-verification-v2';
+import { CredentialIssuance } from "@pages/credential-issuance/credential-issuance";
+import { CredentialVerificationV1 } from "@pages/credential-verification-v1/credential-verification-v1";
+import { CredentialVerificationV2 } from '@pages/credential-verification-v2/credential-verification-v2';
 
 export const routes: Routes = [
     {

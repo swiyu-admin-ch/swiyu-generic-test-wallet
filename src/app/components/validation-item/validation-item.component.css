@@ -1,0 +1,46 @@
+.validation-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+[matListItemTitle] {
+  flex: 1;
+}
+
+.help-icon {
+  font-size: 18px;
+  color: gray;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.icon {
+  flex-shrink: 0;
+}
+
+.icon--pending {
+  color: gray;
+}
+
+.icon--optional {
+  color: orange;
+}
+
+.icon--valid {
+  color: green;
+}
+
+.icon--invalid {
+  color: red;
+}
+
+.text {
+  flex: 1;
+}
+
+.help-icon {
+  font-size: 18px;
+  color: gray;
+  cursor: pointer;
+}

@@ -19,7 +19,7 @@
             "polyfills": [
               "zone.js"
             ],
-            "tsConfig": "tsconfig.json",
+            "tsConfig": "tsconfig.app.json",
             "assets": [
               "src/favicon.ico"
             ],
@@ -69,6 +69,9 @@
               "src/**/*.html"
             ]
           }
+        },
+        "test": {
+          "builder": "@angular/build:unit-test"
         }
       }
     }

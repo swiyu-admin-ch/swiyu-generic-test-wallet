@@ -1,0 +1,27 @@
+.json-container {
+  position: relative;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 12px;
+  background: #fafafa;
+}
+
+.copy-button {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+
+pre {
+  margin: 0;
+  overflow: auto;
+}
+
+.json-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: #666;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}

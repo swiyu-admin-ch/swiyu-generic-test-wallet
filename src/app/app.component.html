@@ -1,19 +1,37 @@
 <app-header></app-header>
 
-<div class="app-wrapper">
-  <nav mat-tab-nav-bar [tabPanel]="tabPanel" class="app-navigation">
-      @for (link of routes | slice:0:3; track link.path) {
-      <a mat-tab-link [routerLink]="link.path" routerLinkActive routerLinkActiveOptions="{ exact: true }"
-          #rla="routerLinkActive" [active]="rla.isActive"
-          [ngClass]="link.data?.cssClass">
-          {{ link.title }}
-      </a>
-      }
-  </nav>
+<div class="app-sidenav-container"
+    [class.wallet-open]="isWalletInfoDrawerOpen()">
+    <div class="app-sidenav-content">
+        <div class="app-wrapper">
+            <nav mat-tab-nav-bar
+                [tabPanel]="tabPanel"
+                class="app-navigation">
+                @for (link of routes | slice:0:3; track link.path) {
+                <a mat-tab-link
+                    [routerLink]="link.path"
+                    routerLinkActive
+                    [routerLinkActiveOptions]="{ exact: true }"
+                    #rla="routerLinkActive"
+                    [active]="rla.isActive"
+                    [ngClass]="link.data?.['cssClass']">
+                    {{ link.title }}
+                </a>
+                }
+            </nav>
 
-  <mat-tab-nav-panel #tabPanel></mat-tab-nav-panel>
+            <mat-tab-nav-panel #tabPanel></mat-tab-nav-panel>
 
-  <div class="app-content">
-    <router-outlet />
-  </div>
+            <div class="app-content">
+                <router-outlet />
+            </div>
+        </div>
+    </div>
+
+    <div class="wallet-info-panel"
+        [class.open]="isWalletInfoDrawerOpen()">
+        <div class="panel-content">
+            <app-holder></app-holder>
+        </div>
+    </div>
 </div>

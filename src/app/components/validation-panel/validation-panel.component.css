@@ -1,0 +1,28 @@
+.error-message-panel {
+  padding: 12px;
+  margin-bottom: 12px;
+  background-color: #ffebee;
+  border-left: 4px solid #d32f2f;
+  border-radius: 2px;
+  color: #c62828;
+  font-size: 14px;
+}
+
+.error-message-panel strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #d32f2f;
+}
+
+.error-message-panel p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+::ng-deep .error-message-panel + mat-expansion-panel-header {
+  background-color: #fff5f5 !important;
+}
+
+.panel-icon {
+  margin-right: 8px;
+}

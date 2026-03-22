@@ -1,0 +1,23 @@
+@if (data()) {
+  <div class="json-container">
+
+    @if (title()) {
+      <div class="json-title">
+        {{ title() }}
+      </div>
+    }
+
+    <pre>{{ displayedJson }}</pre>
+
+    <button
+      mat-icon-button
+      class="copy-button"
+      (click)="copy()"
+      aria-label="Copy JSON">
+
+      <mat-icon>content_copy</mat-icon>
+
+    </button>
+
+  </div>
+}
