@@ -1,5 +1,5 @@
 import { JWK } from "jose";
 
-export type JWKS = {
+export interface JWKS {
   keys: JWK[];
-};
+}

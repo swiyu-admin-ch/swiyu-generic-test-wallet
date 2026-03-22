@@ -40,7 +40,9 @@ export class ApiService {
             return this.decodeJwtPayload(response);
           }
         }),
-        catchError((error) => this.handleError(error, verifierRequestObjectUrl))
+        catchError((error) => {
+          throw new Error(error)
+        })
       );
   }
 
@@ -57,12 +59,6 @@ export class ApiService {
     } catch (error) {
       throw new Error(`Failed to decode JWT payload: ${error}`);
     }
-  }
-
-  private handleError(error: HttpErrorResponse | Error, url?: string): Observable<never> {
-    console.error(error);
-
-    return throwError(() => error);
   }
 
   public submitVerificationResponse(

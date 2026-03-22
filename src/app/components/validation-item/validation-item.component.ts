@@ -13,7 +13,7 @@ import { NgClass } from '@angular/common';
 })
 export class ValidationItemComponent {
   data: InputSignal<unknown> = input.required();
-  validData: InputSignal<unknown> = input.required();
+  validData: InputSignal<unknown | undefined> = input.required();
   text: InputSignal<string> = input.required();
   optional = input<string | null>(null);
 

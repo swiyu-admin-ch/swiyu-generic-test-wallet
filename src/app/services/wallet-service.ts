@@ -3,7 +3,7 @@ import { HolderKeyService } from './holder-key.service';
 import { CryptoService } from './crypto-service';
 import { JwtPayload, OpenIdMetadataResponse, RegistryEntry } from '@app/models/api-response';
 import * as jose from "jose";
-import { CreateCredentialRequest, CredentialEndpointResponse, NonceResponse } from 'src/generated/issuer';
+import { CreateCredentialRequest, CredentialConfiguration, CredentialEndpointResponse, NonceResponse } from 'src/generated/issuer';
 import { WalletOptions } from '@app/models/wallet-options';
 import { VCRecord } from '@app/models/vc-record';
 
@@ -62,7 +62,7 @@ export class WalletService {
   }
 
   updatePayloadEncryptionPreference(value: boolean): void {
-    this.walletOptions.update((options: any) => ({
+    this.walletOptions.update((options: WalletOptions) => ({
       ...options,
       payloadEncryptionPreference: value
     }));
@@ -70,7 +70,7 @@ export class WalletService {
   }
 
   updateNumberOfProofs(value: false | number): void {
-    this.walletOptions.update((options: any) => ({
+    this.walletOptions.update((options: WalletOptions) => ({
       ...options,
       numberOfProofs: value
     }));
@@ -78,7 +78,7 @@ export class WalletService {
   }
 
   updateUseSignedMetadata(value: boolean): void {
-    this.walletOptions.update((options: any) => ({
+    this.walletOptions.update((options: WalletOptions) => ({
       ...options,
       useSignedMetadata: value
     }));
@@ -111,7 +111,7 @@ export class WalletService {
 
     return {
       credentialConfigurationId: credentialConfigurationId as string,
-      credentialConfiguration: credentialConfiguration as Record<string, any>
+      credentialConfiguration: credentialConfiguration as CredentialConfiguration
     };
   }
 
@@ -147,7 +147,7 @@ export class WalletService {
     metadata: OpenIdMetadataResponse,
     nonce: NonceResponse,
     proofsSizePreference: number | null = null,
-    encryptionPreference: boolean = false,
+    encryptionPreference = false,
   ): Promise<CreateCredentialRequest | string> {
 
     const buildEncrypted =
@@ -174,9 +174,8 @@ export class WalletService {
       throw new Error('No format available');
     }
 
-    const proofAlg =
-      credentialConfiguration?.['proof_types_supported']?.['jwt']?.['proof_signing_alg_values_supported'][0] as string;
-
+    const proofAlg = credentialConfiguration?.proof_types_supported?.['jwt'].proof_signing_alg_values_supported?.[0]
+      
     if (!proofAlg) {
       throw new Error('No proof signing algorithm available');
     }

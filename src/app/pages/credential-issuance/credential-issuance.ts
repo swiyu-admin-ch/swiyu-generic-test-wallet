@@ -13,9 +13,8 @@ import { DeeplinkService } from "@services/deeplink.service";
 import { DeeplinkInput } from "../../components/deeplink-input/deeplink-input.component";
 import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { SdJwtStoreService } from "@services/sd-jwt-store.service";
-import { MetadataSignatureTrackingService } from "@services/metadata-signature-tracking.service";
-import { CredentialEndpointResponse, IssuerCredentialRequestEncryption, IssuerCredentialResponseEncryption, NonceResponse, OAuthToken } from "src/generated/issuer";
-import { JwtPayload, OpenIdMetadataResponse, RegistryEntry, OpenIdConfigResponse, CredentialResponse } from "@app/models/api-response";
+import { CredentialConfiguration, CredentialEndpointResponse, IssuerCredentialRequestEncryption, IssuerCredentialResponseEncryption, NonceResponse, OAuthToken } from "src/generated/issuer";
+import { JwtPayload, OpenIdMetadataResponse, RegistryEntry, OpenIdConfigResponse } from "@app/models/api-response";
 import { DataViewerComponent } from "@app/components/data-viewer/data-viewer.component";
 import { HolderKeysCardComponent } from "@components/holder/holder.component";
 import { catchError, tap } from 'rxjs/operators';
@@ -24,9 +23,7 @@ import { CredentialOffer } from "@app/models/credential-offer";
 import { CryptoService } from "@app/services/crypto-service";
 import { ErrorFormatterService } from "@app/services/error-formatter-service";
 import { WalletService } from "@app/services/wallet-service";
-import * as jose from "jose";
 import { ApiService } from "@app/services/api-service";
-import { ToastService } from "@app/services/toast.service";
 
 @Component({
   selector: "app-credential-issuance",
@@ -55,10 +52,8 @@ export class CredentialIssuance {
   private oidvciService = inject(OIDVCIService);
   private cryptoService = inject(CryptoService);
   private deeplinkService = inject(DeeplinkService);
-  private metadataSignatureTrackingService = inject(MetadataSignatureTrackingService);
   private walletService = inject(WalletService);
   private apiService = inject(ApiService);
-  private toastService = inject(ToastService);
   private sdJwtStore = inject(SdJwtStoreService);
   private errorFormatter = inject(ErrorFormatterService);
 
@@ -77,12 +72,11 @@ export class CredentialIssuance {
   issuerMetadata: WritableSignal<OpenIdMetadataResponse | undefined> = signal(undefined);
   issuerMetadataError = signal<Record<string, any> | string | undefined>(undefined);
 
-  credentialConfigurationsSupported: WritableSignal<Record<string, unknown> | undefined> = signal(undefined);
+  credentialConfigurationsSupported: WritableSignal<Record<string, CredentialConfiguration> | undefined> = signal(undefined);
   
   openIdConfigurationResponse: WritableSignal<OpenIdConfigResponse | string | undefined> = signal(undefined);
   openIdConfiguration: WritableSignal<OpenIdConfigResponse | undefined> = signal(undefined);
   openIdConfigurationError = signal<Record<string, any> | string | undefined>(undefined);
-
   
   credentialResponse: WritableSignal<CredentialEndpointResponse | string | undefined> = signal(undefined);
   credential: WritableSignal<CredentialEndpointResponse | undefined> = signal(undefined);
@@ -101,7 +95,6 @@ export class CredentialIssuance {
   decodedHeader: WritableSignal<JwtPayload | undefined> = signal(undefined);
   decodedHeaderError = signal<Record<string, any> | string | undefined>(undefined);
 
-
   credentialConfig: WritableSignal<Record<string, unknown> | undefined> = signal(undefined);
   openIdConfig: WritableSignal<Record<string, unknown> | undefined> = signal(undefined);
   tokenResponse: WritableSignal<OAuthToken | undefined> = signal(undefined);
@@ -115,9 +108,6 @@ export class CredentialIssuance {
 
   openidError = signal<Record<string, any> | string | undefined>(undefined);
   tokenError = signal<Record<string, any> | string | undefined>(undefined);
-
-  openIdMetadataIsSigned = this.metadataSignatureTrackingService.getOpenIdMetadataIsSigned();
-  openIdConfigMetadataIsSigned = this.metadataSignatureTrackingService.getOpenIdConfigMetadataIsSigned();
   
   public onClear(): void {
     this.reset();
@@ -292,7 +282,10 @@ export class CredentialIssuance {
           return EMPTY;
         }),
         switchMap(() => {
-          const credential = this.credential().credentials[0].credential;
+          const credential = this.credential()?.credentials?.[0]?.credential ?? null;
+          if (!credential) {
+            throw new Error("Credential is missing");
+          }
           const registryEntry = this.walletService.buildRegistryUrl(credential)
           return this.oidvciService.fetchRegistryEntry(registryEntry);
         }),
@@ -305,7 +298,10 @@ export class CredentialIssuance {
           return EMPTY;
         }),
         switchMap(() => {
-          const credential = this.credential().credentials[0].credential;
+          const credential = this.credential()?.credentials?.[0]?.credential ?? null;
+          if (!credential) {
+            throw new Error("Credential is missing")
+          }
           const registryEntry = this.registryEntry() as RegistryEntry[]
           const jwt = credential.split("~")[0];
           if (!registryEntry) {
@@ -319,7 +315,7 @@ export class CredentialIssuance {
         })
       )
       .subscribe(() => {
-        const credential = this.credential().credentials[0].credential;
+        const credential = this.credential()?.credentials?.[0]?.credential ?? null;
         if (credential) {
           this.encodedCredential.set(credential);
           const decodedPayloadData = this.decodedPayload() as Record<string, unknown>;
@@ -335,19 +331,33 @@ export class CredentialIssuance {
   public reset(): void {
     this.credentialOffer.set(undefined);
     this.credentialOfferError.set(undefined);
+    this.issuerMetadataResponse.set(undefined);
     this.issuerMetadata.set(undefined);
+    this.issuerMetadataError.set(undefined);
+    this.credentialConfigurationsSupported.set(undefined);
+    this.openIdConfigurationResponse.set(undefined);
+    this.openIdConfiguration.set(undefined);
+    this.openIdConfigurationError.set(undefined);
+    this.credentialResponse.set(undefined);
+    this.credential.set(undefined);
+    this.credentialError.set(undefined);
+    this.oAuthToken.set(undefined);
+    this.oAuthTokenError.set(undefined);
+    this.nonce.set(undefined);
+    this.nonceError.set(undefined);
+    this.registryEntry.set(undefined);
+    this.registryEntryError.set(undefined);
+    this.decodedPayload.set(undefined);
+    this.decodedHeader.set(undefined);
+    this.decodedHeaderError.set(undefined);
     this.credentialConfig.set(undefined);
     this.openIdConfig.set(undefined);
     this.tokenResponse.set(undefined);
     this.nonceResponse.set(undefined);
+    this.credentialsResponse.set(undefined);
     this.encodedCredential.set(undefined);
-    this.decodedPayload.set(undefined);
-    this.decodedHeader.set(undefined);
     this.credentialRequestEncryption.set(undefined);
     this.credentialResponseEncryption.set(undefined);
-    this.registryEntry.set(undefined);
-    this.credentialsResponse.set(undefined);
-    this.tokenError.set(undefined);
   }
 
   public checkIfKeyPresent(): boolean {

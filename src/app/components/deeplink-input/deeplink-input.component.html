@@ -2,7 +2,7 @@
     <div class="resolver">
         <mat-form-field appearance="outline" class="example-full-width">
             <mat-label>Enter deeplink here</mat-label>
-            <textarea [(ngModel)]="input" matInput name="input" [placeholder]="label" rows="6"></textarea>
+            <textarea [(ngModel)]="input" matInput name="input" [placeholder]="label || ''" rows="6"></textarea>
         </mat-form-field>
         <div class="actions">
             <button color="primary" matButton="filled" type="submit">Resolve</button>

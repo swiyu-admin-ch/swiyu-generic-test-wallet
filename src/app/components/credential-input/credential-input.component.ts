@@ -124,7 +124,10 @@ export class Credential implements OnChanges {
     }
   }
 
-  public onResolve(input: string): void {
+  public onResolve(event: Event): void {
+    const input = (event.target as HTMLTextAreaElement)?.value;
+    if (!input) return;
+
     this.encodedCredential = input;
     this.credentialChange.emit(input);
     this.getCredentialDetails();

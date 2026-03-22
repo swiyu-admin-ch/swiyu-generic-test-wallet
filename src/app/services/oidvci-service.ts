@@ -114,7 +114,7 @@ export class OIDVCIService {
   ): Observable<CredentialEndpointResponse | string> {
     const encrypted = typeof payload === 'string'
     
-    let headers = new HttpHeaders({
+    const headers = new HttpHeaders({
       "Authorization": `Bearer ${bearerToken}`,
       "SWIYU-API-Version": "2",
       "Content-Type": encrypted ? "application/jwt" : "application/json"

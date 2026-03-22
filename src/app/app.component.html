@@ -14,7 +14,7 @@
                     [routerLinkActiveOptions]="{ exact: true }"
                     #rla="routerLinkActive"
                     [active]="rla.isActive"
-                    [ngClass]="link.data?.cssClass">
+                    [ngClass]="link.data?.['cssClass']">
                     {{ link.title }}
                 </a>
                 }
