@@ -1,7 +1,8 @@
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { CredentialResponse, OpenIdConfigResponse, OpenIdMetadataResponse, RegistryEntry } from '@app/models/api-response';
-import { catchError, Observable } from 'rxjs';
+import { OpenIdConfigResponse, OpenIdMetadataResponse, RegistryEntry } from '@app/models/api-response';
+import { Observable } from 'rxjs';
+import { CredentialEndpointResponse } from 'src/generated/issuer';
 import { CredentialEndpointRequest } from 'src/generated/issuer/model/credentialEndpointRequest';
 import { NonceResponse } from 'src/generated/issuer/model/nonceResponse';
 import { OAuthToken } from 'src/generated/issuer/model/oAuthToken';
@@ -110,7 +111,7 @@ export class OIDVCIService {
     credentialEndpointUrl: string,
     payload: CredentialEndpointRequest | string, 
     bearerToken: string
-  ): Observable<any | string> {
+  ): Observable<CredentialEndpointResponse | string> {
     const encrypted = typeof payload === 'string'
     
     let headers = new HttpHeaders({

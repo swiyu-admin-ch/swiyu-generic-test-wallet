@@ -13,4 +13,3 @@ export type RegistryEntry = Record<number, unknown>;
 export type PresentationSubmission = Record<string, unknown>;
 
 export type VpTokenMap = Record<string, string[]>;
-

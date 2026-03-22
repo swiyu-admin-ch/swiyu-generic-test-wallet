@@ -6,13 +6,6 @@ import { CredentialOffer } from '@models/credential-offer';
 })
 export class DeeplinkService {
 
-  /**
-   * Decode a swiyu:// deeplink and extract the credential offer JSON
-   * @param deeplink - The swiyu:// deeplink URL
-   * @returns Parsed credential offer as a CredentialOffer object
-   * @throws Error if deeplink is invalid or parsing fails
-   */
-
   public decodeSwiyuDeeplink(deeplink: string): CredentialOffer {
     if (!deeplink) {
       throw new Error('No deeplink provided');
@@ -37,12 +30,6 @@ export class DeeplinkService {
     }
   }
 
-  /**
-   * Extract the credential_offer parameter value from a swiyu:// deeplink
-   * @param decodedUri - The decoded URI string
-   * @returns The credential offer string (still URL-encoded)
-   * @throws Error if credential_offer parameter is not found
-   */
   private extractCredentialOfferString(decodedUri: string): string {
     const parts = decodedUri.split('credential_offer=');
 

@@ -76,9 +76,9 @@ export class CryptoService {
   }
 
   async decryptPayload(
-    input: any,
+    input: unknown | string,
     privateKey: CryptoKey,
-  ): Promise<any> {
+  ): Promise<unknown> {
     try {
       if (typeof input !== 'string') {
         return input;

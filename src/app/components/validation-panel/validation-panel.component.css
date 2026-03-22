@@ -1,5 +1,3 @@
-/* Panel component styles */
-
 .error-message-panel {
   padding: 12px;
   margin-bottom: 12px;
@@ -21,7 +19,6 @@
   line-height: 1.5;
 }
 
-/* Make the panel header match the icon color when there's an error */
 ::ng-deep .error-message-panel + mat-expansion-panel-header {
   background-color: #fff5f5 !important;
 }

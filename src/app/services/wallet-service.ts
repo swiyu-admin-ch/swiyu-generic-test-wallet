@@ -1,10 +1,9 @@
 import { inject, Injectable, signal, WritableSignal } from '@angular/core';
-import { CredentialService } from './credential.service';
 import { HolderKeyService } from './holder-key.service';
 import { CryptoService } from './crypto-service';
 import { JwtPayload, OpenIdMetadataResponse, RegistryEntry } from '@app/models/api-response';
 import * as jose from "jose";
-import { NonceResponse } from 'src/generated/issuer';
+import { CreateCredentialRequest, CredentialEndpointResponse, NonceResponse } from 'src/generated/issuer';
 import { WalletOptions } from '@app/models/wallet-options';
 import { VCRecord } from '@app/models/vc-record';
 
@@ -13,7 +12,6 @@ import { VCRecord } from '@app/models/vc-record';
   providedIn: 'root',
 })
 export class WalletService {
-  private credentialService = inject(CredentialService);
   private holderKeyService = inject(HolderKeyService);
   private cryptoService = inject(CryptoService);
   private requestedVCs: WritableSignal<VCRecord[]> = signal([]);
@@ -111,8 +109,8 @@ export class WalletService {
 
     const [credentialConfigurationId, credentialConfiguration] = entries[0];
 
-    return { 
-      credentialConfigurationId: credentialConfigurationId as string, 
+    return {
+      credentialConfigurationId: credentialConfigurationId as string,
       credentialConfiguration: credentialConfiguration as Record<string, any>
     };
   }
@@ -135,14 +133,14 @@ export class WalletService {
   }
 
   public async decodeJwt(jwt: string, registryEntry: RegistryEntry[]): Promise<{ payload: JwtPayload, protectedHeader: JwtPayload, }> {
-      const kid = (jose.decodeProtectedHeader(jwt) as JwtPayload)['kid'];
-      const verificationMethods = (registryEntry[3] as Record<string, unknown>)?.['value'] as Record<string, unknown>;
-      const verificationMethod = ((verificationMethods?.['verificationMethod'] as Record<string, unknown>[]) || [])
-          .map(meth => (meth as Record<string, unknown>)['id'] === kid ? meth : null)
-          .filter((meth: Record<string, unknown> | null): meth is Record<string, unknown> => meth != null)[0];
-      const jwk = verificationMethod?.['publicKeyJwk'] as CryptoKey;
-      const {payload, protectedHeader} = await jose.jwtVerify(jwt, jwk, {})
-      return {payload: payload as JwtPayload, protectedHeader: protectedHeader as JwtPayload};
+    const kid = (jose.decodeProtectedHeader(jwt) as JwtPayload)['kid'];
+    const verificationMethods = (registryEntry[3] as Record<string, unknown>)?.['value'] as Record<string, unknown>;
+    const verificationMethod = ((verificationMethods?.['verificationMethod'] as Record<string, unknown>[]) || [])
+      .map(meth => (meth as Record<string, unknown>)['id'] === kid ? meth : null)
+      .filter((meth: Record<string, unknown> | null): meth is Record<string, unknown> => meth != null)[0];
+    const jwk = verificationMethod?.['publicKeyJwk'] as CryptoKey;
+    const { payload, protectedHeader } = await jose.jwtVerify(jwt, jwk, {})
+    return { payload: payload as JwtPayload, protectedHeader: protectedHeader as JwtPayload };
   }
 
   async buildRequestCredential(
@@ -150,7 +148,7 @@ export class WalletService {
     nonce: NonceResponse,
     proofsSizePreference: number | null = null,
     encryptionPreference: boolean = false,
-  ): Promise<any> {
+  ): Promise<CreateCredentialRequest | string> {
 
     const buildEncrypted =
       metadata.credential_request_encryption?.encryption_required ||
@@ -193,7 +191,7 @@ export class WalletService {
       proofs.jwt.push(jwt);
     }
 
-    const payload: any = {
+    const payload: CreateCredentialRequest = {
       format,
       credential_configuration_id: credentialConfigurationId,
       proofs,
@@ -222,7 +220,7 @@ export class WalletService {
       const jwk = requestEnc?.jwks?.keys?.[0];
       const alg = jwk?.alg;
       const enc = requestEnc?.enc_values_supported?.[0];
-      const zip = requestEnc?.zip_values_supported?.[0]; 
+      const zip = requestEnc?.zip_values_supported?.[0];
 
       if (!jwk) {
         throw new Error('No encryption key available in credential_request_encryption.jwks.keys');
@@ -271,14 +269,14 @@ export class WalletService {
     return jwt;
   }
 
-  async resolveResponseCredential(encryptedResponse: string) {
+  async resolveResponseCredential(encryptedResponse: CredentialEndpointResponse | string) {
     const privateKey = this.getEphemeralPrivateKey();
 
     if (!privateKey) {
       throw new Error('Missing wallet ephemeral private key');
     }
 
-    return this.cryptoService.decryptPayload(encryptedResponse, privateKey);
+    return this.cryptoService.decryptPayload(encryptedResponse, privateKey) as CredentialEndpointResponse;
   }
 
   getRequestedVCs(): WritableSignal<VCRecord[]> {

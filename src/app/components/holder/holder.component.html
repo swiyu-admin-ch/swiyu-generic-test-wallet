@@ -3,8 +3,8 @@
     <h5>Wallet</h5>
   </mat-card-title>
   <mat-card-content>
-    <!-- <div style="margin-bottom: 16px;">
-      <h4 style="margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; color: #666;">
+    <div style="margin-bottom: 16px;">
+      <h4 style="font-size: 12px; text-transform: uppercase; color: #666;">
         Holder Keys
         <button
           mat-icon-button
@@ -22,7 +22,7 @@
       <p style="margin: 4px 0; font-size: 13px;">
         <strong>Key ID:</strong> <code style="background: #f5f5f5; padding: 2px 4px; border-radius: 2px; font-size: 11px;">{{ getCurrentKeyId() }}</code>
       </p>
-    </div> -->
+    </div>
 
     <div>
       <h4 style="margin: 0 0 12px 0; font-size: 12px; text-transform: uppercase; color: #666;">
@@ -32,7 +32,7 @@
       <div style="margin-bottom: 12px;">
         <div style="display: flex; align-items: center; justify-content: space-between;">
           <div style="display: flex; align-items: center; gap: 4px;">
-            <label style="font-size: 13px; margin: 0;">Use Signed Metadata</label>
+            <span style="font-size: 13px; margin: 0;">Use Signed Metadata</span>
             <mat-icon matTooltip="Use signed metadata instead of unsigned metadata"
               matTooltipPosition="above"
               style="font-size: 14px; width: 14px; height: 14px; ">info</mat-icon>
@@ -47,7 +47,7 @@
       <div style="margin-bottom: 12px;">
         <div style="display: flex; align-items: center; justify-content: space-between;">
           <div style="display: flex; align-items: center; gap: 4px;">
-            <label style="font-size: 13px; margin: 0;">Payload Encryption Preference</label>
+            <span style="font-size: 13px; margin: 0;">Payload Encryption Preference</span>
             <mat-icon matTooltip="Prefer payload encryption even if not enforced"
               matTooltipPosition="above"
               style="font-size: 14px; width: 14px; height: 14px; ">info</mat-icon>
@@ -59,10 +59,10 @@
         </div>
       </div>
 
-      <div>
+      <div style="display:none">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
           <div style="display: flex; align-items: center; gap: 4px;">
-            <label style="font-size: 13px; margin: 0;">Custom Number of Proofs</label>
+            <span style="font-size: 13px; margin: 0;">Custom Number of Proofs</span>
             <mat-icon
               matTooltip="Use a custom number of proofs instead of batch size from metadata"
               matTooltipPosition="above"
@@ -104,10 +104,11 @@
         </p>
         <div style="max-height: 200px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 2px; padding: 8px;">
           @for (vc of requestedVCs(); track vc.id) {
-          <div (click)="copyCredentialToClipboard(vc.sdJwt, vc.credentialType)"
-            style="margin-bottom: 8px; padding: 8px; border-bottom: 1px solid #f0f0f0; cursor: pointer; border-radius: 2px; transition: background-color 0.2s ease;"
-            (mouseenter)="$event.currentTarget.style.backgroundColor = '#f5f5f5'"
-            (mouseleave)="$event.currentTarget.style.backgroundColor = 'transparent'">
+          <div 
+            tabindex="0"
+            (click)="copyCredentialToClipboard(vc.sdJwt, vc.credentialType)"
+            (keydown.enter)="copyCredentialToClipboard(vc.sdJwt, vc.credentialType)"
+            style="margin-bottom: 8px; padding: 8px; border-bottom: 1px solid #f0f0f0; cursor: pointer; border-radius: 2px; transition: background-color 0.2s ease;">
             <div style="display: flex; align-items: center; justify-content: space-between;">
               <p style="margin: 0; font-size: 12px; flex: 1;">
                 <strong>{{ vc.credentialType }}</strong>

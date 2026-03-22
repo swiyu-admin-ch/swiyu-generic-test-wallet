@@ -14,7 +14,7 @@ import { DeeplinkInput } from "../../components/deeplink-input/deeplink-input.co
 import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { SdJwtStoreService } from "@services/sd-jwt-store.service";
 import { MetadataSignatureTrackingService } from "@services/metadata-signature-tracking.service";
-import { IssuerCredentialRequestEncryption, IssuerCredentialResponseEncryption, NonceResponse, OAuthToken } from "src/generated/issuer";
+import { CredentialEndpointResponse, IssuerCredentialRequestEncryption, IssuerCredentialResponseEncryption, NonceResponse, OAuthToken } from "src/generated/issuer";
 import { JwtPayload, OpenIdMetadataResponse, RegistryEntry, OpenIdConfigResponse, CredentialResponse } from "@app/models/api-response";
 import { DataViewerComponent } from "@app/components/data-viewer/data-viewer.component";
 import { HolderKeysCardComponent } from "@components/holder/holder.component";
@@ -25,6 +25,8 @@ import { CryptoService } from "@app/services/crypto-service";
 import { ErrorFormatterService } from "@app/services/error-formatter-service";
 import { WalletService } from "@app/services/wallet-service";
 import * as jose from "jose";
+import { ApiService } from "@app/services/api-service";
+import { ToastService } from "@app/services/toast.service";
 
 @Component({
   selector: "app-credential-issuance",
@@ -55,10 +57,14 @@ export class CredentialIssuance {
   private deeplinkService = inject(DeeplinkService);
   private metadataSignatureTrackingService = inject(MetadataSignatureTrackingService);
   private walletService = inject(WalletService);
+  private apiService = inject(ApiService);
+  private toastService = inject(ToastService);
   private sdJwtStore = inject(SdJwtStoreService);
   private errorFormatter = inject(ErrorFormatterService);
 
   sdJwt = this.sdJwtStore.getIssuanceSdJwt();
+
+  displayCorsRecommendation = signal(false);
 
   readonly panelOpenState = signal(false);
   public input =
@@ -78,8 +84,8 @@ export class CredentialIssuance {
   openIdConfigurationError = signal<Record<string, any> | string | undefined>(undefined);
 
   
-  credentialResponse: WritableSignal<any | string | undefined> = signal(undefined);
-  credential: WritableSignal<any | undefined> = signal(undefined);
+  credentialResponse: WritableSignal<CredentialEndpointResponse | string | undefined> = signal(undefined);
+  credential: WritableSignal<CredentialEndpointResponse | undefined> = signal(undefined);
   credentialError = signal<Record<string, any> | string | undefined>(undefined);
 
   oAuthToken: WritableSignal<OAuthToken | undefined> = signal(undefined);
@@ -113,8 +119,6 @@ export class CredentialIssuance {
   openIdMetadataIsSigned = this.metadataSignatureTrackingService.getOpenIdMetadataIsSigned();
   openIdConfigMetadataIsSigned = this.metadataSignatureTrackingService.getOpenIdConfigMetadataIsSigned();
   
-  
-
   public onClear(): void {
     this.reset();
   }
@@ -130,7 +134,6 @@ export class CredentialIssuance {
           return of(null);
         }),
         catchError((error) => {
-          console.error(error);
           this.credentialOfferError.set(this.errorFormatter.format(error));
           return EMPTY;
         }),
@@ -156,7 +159,11 @@ export class CredentialIssuance {
         }),
         catchError((error) => {
           console.error(error);
-          this.issuerMetadataError.set(this.errorFormatter.format(error));
+          if (this.apiService.isLikelyCorsError(error)) {
+            this.issuerMetadataError.set(this.errorFormatter.CORS_ERROR_MESSAGE);
+          } else {
+            this.issuerMetadataError.set(this.errorFormatter.format(error));
+          }
           return EMPTY;
         }),
         switchMap(() => {
@@ -269,14 +276,14 @@ export class CredentialIssuance {
             accessToken
           );
         }),
-        switchMap((credentialResponse: any) => {
+        switchMap((credentialResponse: CredentialEndpointResponse | string) => {
           this.credentialResponse.set(credentialResponse);
 
           return from(
             this.walletService.resolveResponseCredential(credentialResponse)
           );
         }),
-        tap((credential) => {
+        tap((credential: CredentialEndpointResponse) => {
           this.credential.set(credential);
         }),
         catchError((error) => {
@@ -328,7 +335,6 @@ export class CredentialIssuance {
   public reset(): void {
     this.credentialOffer.set(undefined);
     this.credentialOfferError.set(undefined);
-
     this.issuerMetadata.set(undefined);
     this.credentialConfig.set(undefined);
     this.openIdConfig.set(undefined);

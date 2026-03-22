@@ -15,7 +15,7 @@ import { WritableSignal } from '@angular/core';
 export class ValidationPanelComponent {
     @Input() panelOpenState: WritableSignal<boolean> | undefined;
     @Input() panelTitle: string | undefined;
-    @Input() data: Record<string, unknown> | undefined = undefined;
+    @Input() data: unknown | undefined = undefined;
     @Input() errorMessage: Record<string, any> | string | undefined = undefined;
 
     isObject(value: unknown): value is Record<string, any> {

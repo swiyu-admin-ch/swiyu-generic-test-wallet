@@ -89,6 +89,7 @@ export class HolderKeysCardComponent implements OnInit {
     try {
       return new Intl.DateTimeFormat(navigator.language, options).format(date);
     } catch (error) {
+      console.error(error);
       return date.toLocaleString();
     }
   }
