@@ -23,7 +23,7 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --no-fund
 
       - name: Generate issuer and verifier APIs
         run: npm run generate:apis
