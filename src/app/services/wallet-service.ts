@@ -196,17 +196,16 @@ export class WalletService {
       proofs,
     };
 
+    const keyPair = await this.cryptoService.generateEphemeralKeyPair("ECDH-ES");
+    this.setEphemeralPrivateKey(keyPair.privateKey);
+    const publicJwk = await this.cryptoService.exportPublicJwk(keyPair.publicKey);
+
     if (buildEncrypted) {
       const encConfig = metadata.credential_response_encryption;
 
       if (encConfig?.alg_values_supported?.length) {
         const alg = encConfig.alg_values_supported[0];
         const enc = encConfig.enc_values_supported?.[0];
-
-        const keyPair = await this.cryptoService.generateEphemeralKeyPair(alg);
-        this.setEphemeralPrivateKey(keyPair.privateKey);
-
-        const publicJwk = await this.cryptoService.exportPublicJwk(keyPair.publicKey);
 
         payload.credential_response_encryption = {
           alg,
@@ -217,7 +216,7 @@ export class WalletService {
 
       const requestEnc = metadata.credential_request_encryption
       const jwk = requestEnc?.jwks?.keys?.[0];
-      const alg = jwk?.alg;
+      const alg = jwk?.alg ? jwk?.alg : encConfig.alg_values_supported[0];
       const enc = requestEnc?.enc_values_supported?.[0];
       const zip = requestEnc?.zip_values_supported?.[0];
 
