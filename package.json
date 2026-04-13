@@ -16,15 +16,14 @@
     "clean:generated": "rm -rf src/generated"
   },
   "dependencies": {
-    "@angular/animations": "^21.2.5",
-    "@angular/cdk": "^21.2.5",
-    "@angular/common": "^21.2.5",
-    "@angular/compiler": "^21.2.5",
-    "@angular/forms": "^21.2.5",
-    "@angular/material": "^21.2.5",
-    "@angular/platform-browser": "^21.2.5",
-    "@angular/router": "^21.2.6",
-    "@mui/icons-material": "^7.3.4",
+    "@angular/animations": "^21.2.8",
+    "@angular/cdk": "^21.2.6",
+    "@angular/common": "^21.2.8",
+    "@angular/compiler": "^21.2.8",
+    "@angular/forms": "^21.2.8",
+    "@angular/material": "^21.2.6",
+    "@angular/platform-browser": "^21.2.8",
+    "@angular/router": "^21.2.8",
     "@sd-jwt/present": "^0.19.0",
     "@sd-jwt/utils": "^0.19.0",
     "jose": "^6.2.1",
@@ -33,19 +32,19 @@
     "zone.js": "^0.16.1"
   },
   "devDependencies": {
-    "@angular/build": "^21.2.6",
-    "@angular/cli": "^21.2.0",
-    "@angular/compiler-cli": "^21.2.0",
-    "@angular/core": "^21.2.5",
+    "@angular/build": "^21.2.7",
+    "@angular/cli": "^21.2.7",
+    "@angular/compiler-cli": "^21.2.8",
+    "@angular/core": "^21.2.8",
     "@openapitools/openapi-generator-cli": "^2.31.1",
     "@types/node": "^25.5.0",
     "@vitest/browser": "^4.1.4",
-    "@vitest/ui": "^4.1.0",
+    "@vitest/ui": "^4.1.4",
     "angular-eslint": "21.3.1",
     "eslint": "^9.39.1",
     "jsdom": "^29.0.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "8.58.0",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.4"
   }
 }
