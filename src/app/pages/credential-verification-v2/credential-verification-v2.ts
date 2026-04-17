@@ -15,6 +15,8 @@ import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { VerificationService } from "@services/verification.service";
 import { HolderKeyService } from "@services/holder-key.service";
 import { SdJwtStoreService } from "@services/sd-jwt-store.service";
+import { VcKeyStoreService } from "@services/vc-key-store.service";
+import { VcStoreService } from "@services/vc-store.service";
 import { Router } from "@angular/router";
 import { DcqlClaimDto, DcqlCredentialDto, DcqlQueryDto, RequestObject } from "src/generated/verifier";
 import { JwtPayload } from "@app/models/api-response";
@@ -46,6 +48,8 @@ export class CredentialVerificationV2 {
   private verificationService = inject(VerificationService);
   private holderKeyService = inject(HolderKeyService);
   private sdJwtStore = inject(SdJwtStoreService);
+  private vcKeyStore = inject(VcKeyStoreService);
+  private vcStore = inject(VcStoreService);
   private router = inject(Router);
 
   sdJwt = this.sdJwtStore.getVerificationSdJwt();
@@ -257,14 +261,30 @@ export class CredentialVerificationV2 {
       iat: Math.floor(new Date().getTime() / 1000)
     };
 
+    let privateKey = this.holderKeyService.getPrivateKey();
+    let jwk = this.holderKeyService.getJwk();
+
+    const storedVCs = this.vcStore.getAllVcs();
+    for (const vc of storedVCs) {
+      if (vc.credential === credentialString) {
+        const keyPair = this.vcKeyStore.getKeyPairByVcId(vc.vcId);
+        if (keyPair) {
+          privateKey = keyPair.privateKey;
+          jwk = keyPair.jwk;
+          break;
+        }
+      }
+    }
+
     const kbJwt = await new SignJWT(kbJwtPayload)
       .setProtectedHeader({
         alg: "ES256",
         typ: "kb+jwt",
+        jwk: jwk
       })
       .setAudience(verifierId)
       .setIssuedAt(new Date())
-      .sign(this.holderKeyService.getPrivateKey());
+      .sign(privateKey);
 
     return `${selectiveDisclosureSdJwt}${kbJwt}`;
   }

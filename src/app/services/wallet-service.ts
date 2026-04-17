@@ -6,6 +6,13 @@ import * as jose from "jose";
 import { CreateCredentialRequest, CredentialConfiguration, CredentialEndpointResponse, NonceResponse } from 'src/generated/issuer';
 import { WalletOptions } from '@app/models/wallet-options';
 import { VCRecord } from '@app/models/vc-record';
+import { VcKeyStoreService } from './vc-key-store.service';
+
+interface ProofKeyPair {
+  proofIndex: number;
+  privateKey: CryptoKey;
+  jwk: jose.JWK;
+}
 
 
 @Injectable({
@@ -14,6 +21,7 @@ import { VCRecord } from '@app/models/vc-record';
 export class WalletService {
   private holderKeyService = inject(HolderKeyService);
   private cryptoService = inject(CryptoService);
+  private vcKeyStore = inject(VcKeyStoreService);
   private requestedVCs: WritableSignal<VCRecord[]> = signal([]);
 
   private readonly STORAGE_KEY = 'wallet_options';
@@ -91,6 +99,7 @@ export class WalletService {
   }
 
   private ephemeralPrivateKey?: CryptoKey;
+  private generatedProofKeyPairs: ProofKeyPair[] = [];
 
   setEphemeralPrivateKey(key: CryptoKey) {
     this.ephemeralPrivateKey = key;
@@ -185,8 +194,34 @@ export class WalletService {
       jwt: [] as string[],
     }
 
+    this.generatedProofKeyPairs = [];
+
     for (let i = 0; i < numberOfProofs; i++) {
-      const jwt = await this.buildHolderBinding(Math.floor(Date.now() / 1000), credentialIssuer, nonce.c_nonce, proofAlg);
+      const { publicKey, privateKey } = await crypto.subtle.generateKey(
+        {
+          name: "ECDSA",
+          namedCurve: "P-256",
+        },
+        true,
+        ["sign", "verify"]
+      );
+
+      const jwk = await jose.exportJWK(publicKey);
+
+      this.generatedProofKeyPairs.push({
+        proofIndex: i,
+        privateKey,
+        jwk
+      });
+
+      const jwt = await this.buildHolderBindingWithKey(
+        Math.floor(Date.now() / 1000),
+        credentialIssuer,
+        nonce.c_nonce,
+        proofAlg,
+        privateKey,
+        jwk
+      );
       proofs.jwt.push(jwt);
     }
 
@@ -265,6 +300,34 @@ export class WalletService {
       .sign(this.holderKeyService.getPrivateKey());
 
     return jwt;
+  }
+
+  async buildHolderBindingWithKey(
+    now: number,
+    audience: string,
+    nonce: string,
+    alg: string,
+    privateKey: CryptoKey,
+    jwk: jose.JWK
+  ): Promise<string> {
+    const claims: Record<string, unknown> = {
+      "aud": audience,
+      "iat": now,
+      "nonce": nonce,
+    }
+
+    const jwt = await new jose.SignJWT(claims)
+      .setProtectedHeader({ alg: alg, typ: 'openid4vci-proof+jwt', jwk: jwk })
+      .setIssuedAt(now)
+      .setAudience(audience)
+      .setExpirationTime('2h')
+      .sign(privateKey);
+
+    return jwt;
+  }
+
+  getGeneratedProofKeyPairs(): ProofKeyPair[] {
+    return this.generatedProofKeyPairs;
   }
 
   async resolveResponseCredential(encryptedResponse: CredentialEndpointResponse | string) {

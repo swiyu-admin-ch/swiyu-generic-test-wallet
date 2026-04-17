@@ -24,6 +24,8 @@ import { CryptoService } from "@app/services/crypto-service";
 import { ErrorFormatterService } from "@app/services/error-formatter-service";
 import { WalletService } from "@app/services/wallet-service";
 import { ApiService } from "@app/services/api-service";
+import { VcKeyStoreService } from "@app/services/vc-key-store.service";
+import { VcStoreService } from "@app/services/vc-store.service";
 
 @Component({
   selector: "app-credential-issuance",
@@ -56,6 +58,8 @@ export class CredentialIssuance {
   private apiService = inject(ApiService);
   private sdJwtStore = inject(SdJwtStoreService);
   private errorFormatter = inject(ErrorFormatterService);
+  private vcKeyStore = inject(VcKeyStoreService);
+  private vcStore = inject(VcStoreService);
 
   sdJwt = this.sdJwtStore.getIssuanceSdJwt();
 
@@ -238,8 +242,11 @@ export class CredentialIssuance {
             throw new Error("Missing nonce")
           }
 
+          const numberOfProofs = this.walletService.getOptions().numberOfProofs;
+          const proofsSizePreference = numberOfProofs === false ? null : numberOfProofs;
+
           return this.walletService.buildRequestCredential(
-            issuerMetadata, nonce, 1, this.walletService.getOptions().payloadEncryptionPreference
+            issuerMetadata, nonce, proofsSizePreference, this.walletService.getOptions().payloadEncryptionPreference
           );
         }),
         catchError((error) => {
@@ -275,6 +282,7 @@ export class CredentialIssuance {
         }),
         tap((credential: CredentialEndpointResponse) => {
           this.credential.set(credential);
+          this.storeCredentialsWithKeys(credential);
         }),
         catchError((error) => {
           console.error(error);
@@ -375,5 +383,42 @@ export class CredentialIssuance {
     const kid = (this.decodedHeader() as JwtPayload)?.["kid"];
 
     return verificationMethods.some((method) => (method as Record<string, unknown>)["id"] === kid);
+  }
+
+  private async storeCredentialsWithKeys(credential: CredentialEndpointResponse): Promise<void> {
+    try {
+      const credentials = credential.credentials ?? [];
+      const proofKeyPairs = this.walletService.getGeneratedProofKeyPairs();
+      const issuerId = this.issuerMetadata()?.["credential_issuer"] as string;
+      const credentialType = this.credentialConfig()?.["id"] as string;
+
+      for (let i = 0; i < credentials.length; i++) {
+        const credentialJwt = credentials[i]?.credential as string;
+        if (!credentialJwt) {
+          continue;
+        }
+
+        const vcId = `vc_${issuerId}_${credentialType}_${Date.now()}_${i}`;
+
+        const proofKeyPair = proofKeyPairs[i];
+        if (proofKeyPair) {
+          await this.vcKeyStore.generateKeyPairForVc(
+            vcId,
+            credentialType,
+            issuerId,
+            {
+              privateKey: proofKeyPair.privateKey,
+              jwk: proofKeyPair.jwk
+            }
+          );
+        } else {
+          await this.vcKeyStore.generateKeyPairForVc(vcId, credentialType, issuerId);
+        }
+
+        this.vcStore.storeVc(vcId, credentialJwt, credentialType, issuerId);
+      }
+    } catch (error) {
+      console.error('Failed to store credentials with keys:', error);
+    }
   }
 }

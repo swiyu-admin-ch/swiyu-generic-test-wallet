@@ -2,34 +2,17 @@ import { Injectable } from '@angular/core';
 import * as jose from "jose";
 import { DcqlCredentialDto, DcqlQueryDto, Field, InputDescriptor, PresentationDefinition } from 'src/generated/verifier';
 import { JwtPayload, RegistryEntry } from "@app/models/api-response";
+import { DeeplinkService } from './deeplink.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class VerificationService {
+  constructor(private deeplinkService: DeeplinkService) {}
 
   public decodeDeeplink(url: string): Record<string, string> {
-    if (!url) {
-      throw new Error("decode")
-    }
-
-    if (url.startsWith('swiyu-verify://')) {
-      const withoutProtocol = url.replace('swiyu-verify://?', '');
-      const decodedUri = decodeURIComponent(withoutProtocol);
-
-      const params = new URLSearchParams(decodedUri);
-      const result: Record<string, string> = {};
-
-      params.forEach((value, key) => {
-        result[key] = value;
-      });
-
-      return result;
-    }
-
-    throw new Error("decode")
+    return this.deeplinkService.decodeVerificationDeeplink(url);
   }
-
 
   public async createHolderBinding(
     credentialIssuer: string,

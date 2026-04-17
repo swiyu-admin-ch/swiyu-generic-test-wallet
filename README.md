@@ -100,7 +100,7 @@ Supported:
 - Issuance V1
     Single `vc+sd-jwt` credential
 - Issuance V2
-    Batch credential endpoint (only the first credential of the batch is currently displayed)
+    Batch credential endpoint with support for multiple credentials
 - Holder binding
     Via `proof_type: jwt` (ES256)
 - Credential request encryption 
@@ -110,10 +110,8 @@ Supported:
 
 Not yet supported (will be available in the future):
 
-- Displaying the full batch of issued credentials
 - Credential renewal flow
 - DPoP (Demonstrating Proof of Possession)
-
 ### Credential Verification (OIDC4VP)
 
 Supported:
@@ -133,13 +131,13 @@ Not yet supported (will be available in the future):
 
 - DPoP (Demonstrating Proof of Possession)
 
-### Ephemeral Holder Keys and Page Refresh
+### Credential Storage and Session Management
 
-The wallet generates an ephemeral ES256 key pair (P-256) in memory each time the application loads or the page is refreshed. This key pair is used for holder binding during issuance and for signing the `kb+jwt` during verification.
+The wallet stores Verifiable Credentials (VCs) and their corresponding holder key pairs in the browser session memory. These credentials and keys are available only during the current session and are not persisted to disk or local storage.
 
-Refreshing the page generates a new key pair. All previously issued SD-JWTs become unusable for verification because the original private key is no longer available.
+**Important:** When you refresh the page, all stored Verifiable Credentials and their associated holder key pairs are lost. The wallet generates new key pairs upon reloading. Previously issued VCs become unusable for verification because the original holder key pairs are no longer available.
 
-Complete the full issuance and verification flow within a single browser session without refreshing the page.
+To complete a full issuance and verification flow, maintain a single browser session without refreshing the page until you have finished all operations.
 
 ## Usage Guide
 
