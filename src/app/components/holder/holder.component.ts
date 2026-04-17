@@ -12,6 +12,7 @@ import { HolderKeyService } from '@services/holder-key.service';
 import { WalletService } from '@services/wallet-service';
 import { signal, WritableSignal } from '@angular/core';
 import { ToastService } from '@app/services/toast.service';
+import { VcStoreService } from '@app/services/vc-store.service';
 
 @Component({
   selector: 'app-holder',
@@ -33,10 +34,12 @@ export class HolderKeysCardComponent implements OnInit {
   private toastService = inject(ToastService);
   private holderKeyService = inject(HolderKeyService);
   private walletService = inject(WalletService);
+  private vcStore = inject(VcStoreService);
 
   holderKeyGeneratedAt: WritableSignal<Date | null> = signal(null);
   numberOfProofsInput: WritableSignal<string> = signal('');
   useCustomNumberOfProofs: WritableSignal<boolean> = signal(false);
+  storedVCs: WritableSignal<any[]> = signal([]);
 
   walletOptions = this.walletService.getOptionsSignal();
   requestedVCs = this.walletService.getRequestedVCs();
@@ -45,15 +48,21 @@ export class HolderKeysCardComponent implements OnInit {
   ngOnInit(): void {
     this.updateKeyGenerationTime();
     this.initializeNumberOfProofsInput();
+    this.loadStoredVCs();
 
     const checkInterval = setInterval(() => {
       const newTime = this.holderKeyService.getKeyGeneratedAt();
       if (newTime && newTime !== this.holderKeyGeneratedAt()) {
         this.holderKeyGeneratedAt.set(newTime);
       }
+      this.loadStoredVCs();
     }, 1000);
 
     window.addEventListener('beforeunload', () => clearInterval(checkInterval));
+  }
+
+  private loadStoredVCs(): void {
+    this.storedVCs.set(this.vcStore.getAllVcs());
   }
 
   private updateKeyGenerationTime(): void {
@@ -139,6 +148,14 @@ export class HolderKeysCardComponent implements OnInit {
       this.toastService.showSuccess(`Credential (${credentialType}) copied to clipboard`);
     }).catch(err => {
       this.toastService.showError('Failed to copy credential to clipboard:', err);
+    });
+  }
+
+  copyStoredVCToClipboard(vc: any): void {
+    navigator.clipboard.writeText(vc.credential).then(() => {
+      this.toastService.showSuccess(`VC (${vc.credentialType}) copied to clipboard`);
+    }).catch(err => {
+      this.toastService.showError('Failed to copy VC to clipboard:', err);
     });
   }
 }

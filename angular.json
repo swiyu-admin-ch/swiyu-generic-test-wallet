@@ -21,7 +21,12 @@
             ],
             "tsConfig": "tsconfig.app.json",
             "assets": [
-              "src/favicon.ico"
+              "src/favicon.ico",
+              {
+                "glob": "**/*.{woff,woff2}",
+                "input": "node_modules/material-icons/iconfont",
+                "output": "/material-icons/"
+              }
             ],
             "styles": [
               "src/custom-theme.scss",
