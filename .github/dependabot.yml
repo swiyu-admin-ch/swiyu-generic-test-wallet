@@ -11,3 +11,13 @@ updates:
       interval: "weekly"
     allow:
       - dependency-type: "all"
+    groups:
+      angular:
+        patterns:
+          - "@angular/*"
+          - "@angular-devkit/*"
+      angular-runtime:
+        patterns:
+          - "rxjs"
+          - "zone.js"
+          - "tslib"
