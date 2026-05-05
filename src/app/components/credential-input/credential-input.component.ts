@@ -159,8 +159,8 @@ export class Credential implements OnChanges {
     }
   }
 
-  public goToVerification(version: string): void {
-    this.router.navigate([`/verifications/${version}`], {
+  public goToVerification(): void {
+    this.router.navigate(["/verification"], {
       state: { credential: this.encodedCredential }
     });
   }

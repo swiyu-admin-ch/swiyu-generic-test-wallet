@@ -32,6 +32,7 @@ import { DrawerService } from "@services/drawer.service";
 })
 export class AppComponent {
     public routes = routes;
+    public navRoutes = routes.filter((route) => route.title);
     private drawerService = inject(DrawerService);
 
     isWalletInfoDrawerOpen = this.drawerService.getIsWalletInfoDrawerOpen();
