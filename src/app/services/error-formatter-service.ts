@@ -27,6 +27,10 @@ google-chrome --disable-web-security --user-data-dir="/tmp/chrome_dev_session"
       return this.formatHttpError(error);
     }
 
+    if (this.isFormattedError(error)) {
+      return error;
+    }
+
     if (error instanceof Error) {
       return {
         message: error.message,
@@ -40,12 +44,20 @@ google-chrome --disable-web-security --user-data-dir="/tmp/chrome_dev_session"
     };
   }
 
-  private formatHttpError(error: HttpErrorResponse): Record<string, unknown> {
+  formatRequestError(error: unknown, method: string): string | Record<string, unknown> {
+    if (error instanceof HttpErrorResponse) {
+      return this.formatHttpError(error, method);
+    }
+
+    return this.format(error);
+  }
+
+  private formatHttpError(error: HttpErrorResponse, method?: string): Record<string, unknown> {
     let response: unknown = null;
 
     if (error.error) {
       if (typeof error.error === 'string') {
-        response = error.error;
+        response = this.tryParseJson(error.error);
       } else if (error.error.message) {
         response = error.error.message;
       } else {
@@ -55,9 +67,27 @@ google-chrome --disable-web-security --user-data-dir="/tmp/chrome_dev_session"
 
     return {
       request: error.url ?? 'Unknown URL',
+      method,
       status: `${error.status} ${error.statusText}`,
       response,
       hint: this.DEFAULT_ERROR_MESSAGE
     };
+  }
+
+  private isFormattedError(error: unknown): error is Record<string, unknown> {
+    return typeof error === 'object' && error !== null && (
+      'request' in error ||
+      'status' in error ||
+      'response' in error ||
+      'message' in error
+    );
+  }
+
+  private tryParseJson(value: string): unknown {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
   }
 }

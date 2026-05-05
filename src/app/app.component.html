@@ -7,7 +7,7 @@
             <nav mat-tab-nav-bar
                 [tabPanel]="tabPanel"
                 class="app-navigation">
-                @for (link of routes | slice:0:3; track link.path) {
+                @for (link of navRoutes; track link.path) {
                 <a mat-tab-link
                     [routerLink]="link.path"
                     routerLinkActive

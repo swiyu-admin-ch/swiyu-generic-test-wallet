@@ -15,13 +15,19 @@
         <div class="error-message-panel">
             @if (isObject(errorMessage)) {
                 <div class="error-block">
-                    <div><strong>Request</strong> {{ errorMessage?.['request'] }}</div>
-                    <div><strong>Status</strong> {{ errorMessage?.['status'] }}</div>
-                    @if (errorMessage?.['response']) {
-                        <div><strong>Response</strong></div>
-                        <pre>{{ errorMessage?.['response'] | json }}</pre>
+                    @if (errorMessage['message']) {
+                        <div><strong>Message</strong> {{ errorMessage['message'] }}</div>
                     }
-                    <div class="hint">{{ errorMessage?.['hint'] }}</div>
+                    <div><strong>Request</strong> {{ errorMessage['request'] }}</div>
+                    @if (errorMessage['method']) {
+                        <div><strong>Method</strong> {{ errorMessage['method'] }}</div>
+                    }
+                    <div><strong>Status</strong> {{ errorMessage['status'] }}</div>
+                    @if (errorMessage['response']) {
+                        <div><strong>Response</strong></div>
+                        <pre>{{ errorMessage['response'] | json }}</pre>
+                    }
+                    <div class="hint">{{ errorMessage['hint'] }}</div>
                 </div>
             } @else {
                 <pre>{{ errorMessage }}</pre>
