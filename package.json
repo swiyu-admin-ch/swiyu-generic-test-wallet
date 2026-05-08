@@ -31,7 +31,7 @@
     "material-icons": "^1.13.14",
     "rxjs": "^7.8.0",
     "service": "^0.1.4",
-    "zone.js": "^0.16.1"
+    "zone.js": "^0.16.2"
   },
   "devDependencies": {
     "@angular/build": "^21.2.8",
