@@ -246,7 +246,7 @@ export class CredentialIssuance {
           const proofsSizePreference = numberOfProofs === false ? null : numberOfProofs;
 
           return this.walletService.buildRequestCredential(
-            issuerMetadata, nonce, proofsSizePreference, this.walletService.getOptions().payloadEncryptionPreference
+            issuerMetadata, nonce, this.credentialOffer()!.credential_configuration_ids[0], proofsSizePreference, this.walletService.getOptions().payloadEncryptionPreference
           );
         }),
         catchError((error) => {
