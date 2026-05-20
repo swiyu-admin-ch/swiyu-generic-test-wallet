@@ -1,10 +1,12 @@
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { OpenIdConfigResponse, OpenIdMetadataResponse, RegistryEntry } from '@app/models/api-response';
-import { Observable } from 'rxjs';
+import { Observable, from, of, switchMap } from 'rxjs';
 import { CredentialEndpointResponse } from 'src/generated/issuer';
 import { NonceResponse } from 'src/generated/issuer/model/nonceResponse';
 import { OAuthToken } from 'src/generated/issuer/model/oAuthToken';
+import { DpopService } from './dpop-service';
+import { DpopKeyPair } from './vc-key-store.service';
 
 @Injectable({
   providedIn: 'root',
@@ -16,6 +18,8 @@ export class OIDVCIService {
     '/.well-known/openid-credential-issuer';
   private static readonly OPENID_CONFIGURATION_PATH =
     '/.well-known/openid-configuration';
+
+  private dpopService = inject(DpopService);
 
   fetchIssuerMetadata(
     issuerUrl: string,
@@ -67,7 +71,9 @@ export class OIDVCIService {
 
   fetchAccessToken(
     tokenEndpointUrl: string,
+    nonceEndpointUrl: string,
     preAuthCode: string,
+    dpopKeys?: DpopKeyPair
   ): Observable<OAuthToken> {
 
     if (!preAuthCode || !tokenEndpointUrl) {
@@ -78,15 +84,31 @@ export class OIDVCIService {
       .set('grant_type', 'urn:ietf:params:oauth:grant-type:pre-authorized_code')
       .set('pre-authorized_code', preAuthCode);
 
-    return this.http.post<OAuthToken>(
-      tokenEndpointUrl,
-      body.toString(),
-      {
-        headers: new HttpHeaders({
+    const nonce$ = this.fetchNonce(nonceEndpointUrl);
+    const proof$ = nonce$.pipe(
+      switchMap((resp: NonceResponse) => {
+        return dpopKeys ? from(this.dpopService.createProof(dpopKeys, 'POST', tokenEndpointUrl, resp.c_nonce)) : of(null);
+      })
+    );
+
+    return proof$.pipe(
+      switchMap((dpopProof) => {
+        const headersObj: Record<string, string> = {
           'Content-Type': 'application/x-www-form-urlencoded',
-        }),
-        responseType: 'json',
-      }
+          "Accept": "application/json",
+        };
+
+        if (dpopKeys && dpopProof) {
+          headersObj['DPoP'] = dpopProof as string;
+        }
+
+        const headers = new HttpHeaders(headersObj);
+
+        return this.http.post<OAuthToken>(tokenEndpointUrl, body.toString(), {
+          headers,
+          responseType: 'json',
+        });
+      }),
     );
   }
 
@@ -108,16 +130,35 @@ export class OIDVCIService {
 
   fetchCredential(
     credentialEndpointUrl: string,
+    nonceEndpointUrl: string,
     payload: any | string, 
-    bearerToken: string
+    bearerToken: string,
+    dpopKeys?: DpopKeyPair
   ): Observable<CredentialEndpointResponse | string> {
-    const encrypted = typeof payload === 'string'
-    
-    const headers = new HttpHeaders({
+    const encrypted = typeof payload === 'string';
+    const nonce$ = this.fetchNonce(nonceEndpointUrl);
+    const headers = {
       "Authorization": `Bearer ${bearerToken}`,
-      "SWIYU-API-Version": "2",
       "Content-Type": encrypted ? "application/jwt" : "application/json"
-    });
+    };
+
+    if (!!dpopKeys) {
+      return nonce$.pipe(
+        switchMap((resp: NonceResponse) => from(this.dpopService.createProof(
+          dpopKeys,
+          "POST",
+          credentialEndpointUrl,
+          resp.c_nonce,
+          bearerToken
+        ))),
+      switchMap((dpopProof) => {
+        console.log("DPoP Proof created:", dpopProof);
+        return this.http.post<any | string>(credentialEndpointUrl, payload, {
+          headers: { ...headers, DPoP: dpopProof as string },
+          responseType: encrypted ? ("text" as any) : "json",
+        });
+      }));
+    }
 
     return this.http.post<any | string>(
       credentialEndpointUrl, 

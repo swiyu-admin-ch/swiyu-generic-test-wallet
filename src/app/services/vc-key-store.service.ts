@@ -11,11 +11,33 @@ export interface VcKeyPair {
   issuerId: string;
 }
 
+export interface DpopKeyPair {
+  privateKey: CryptoKey;
+  publicKey: CryptoKey;
+  jwk: jose.JWK;
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class VcKeyStoreService {
-  private vcKeyPairs = new Map<string, VcKeyPair>();
+  private vcKeyPair = new Map<string, VcKeyPair>();
+
+  async generateDpopKeyPair(): Promise<DpopKeyPair> {
+    const keyPair = await crypto.subtle.generateKey(
+      {
+        name: 'ECDSA',
+        namedCurve: 'P-256',
+      },
+      true,
+      ['sign', 'verify']
+    );
+    const publicKey = keyPair.publicKey;
+    const privateKey = keyPair.privateKey;
+    const jwk = await jose.exportJWK(publicKey);
+
+    return { privateKey, publicKey, jwk };
+  }
 
   async generateKeyPairForVc(
     vcId: string,
@@ -61,39 +83,39 @@ export class VcKeyStoreService {
       issuerId
     };
 
-    this.vcKeyPairs.set(vcId, vcKeyPair);
+    this.vcKeyPair.set(vcId, vcKeyPair);
     return vcKeyPair;
   }
 
   getKeyPairByVcId(vcId: string): VcKeyPair | undefined {
-    return this.vcKeyPairs.get(vcId);
+    return this.vcKeyPair.get(vcId);
   }
 
   getPrivateKeyByVcId(vcId: string): CryptoKey | null {
-    const keyPair = this.vcKeyPairs.get(vcId);
+    const keyPair = this.vcKeyPair.get(vcId);
     return keyPair?.privateKey ?? null;
   }
 
   getPublicKeyByVcId(vcId: string): CryptoKey | null {
-    const keyPair = this.vcKeyPairs.get(vcId);
+    const keyPair = this.vcKeyPair.get(vcId);
     return keyPair?.publicKey ?? null;
   }
 
   getJwkByVcId(vcId: string): jose.JWK | null {
-    const keyPair = this.vcKeyPairs.get(vcId);
+    const keyPair = this.vcKeyPair.get(vcId);
     return keyPair?.jwk ?? null;
   }
 
   getAllKeyPairs(): VcKeyPair[] {
-    return Array.from(this.vcKeyPairs.values());
+    return Array.from(this.vcKeyPair.values());
   }
 
   deleteKeyPairByVcId(vcId: string): boolean {
-    return this.vcKeyPairs.delete(vcId);
+    return this.vcKeyPair.delete(vcId);
   }
 
   clearAllKeyPairs(): void {
-    this.vcKeyPairs.clear();
+    this.vcKeyPair.clear();
   }
 }
 

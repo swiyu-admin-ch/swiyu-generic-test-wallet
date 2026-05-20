@@ -1,7 +1,7 @@
 import { Component, inject, signal, WritableSignal } from "@angular/core";
 import { Credential } from "@app/components/credential-input/credential-input.component";
 import { FormsModule } from "@angular/forms";
-import { EMPTY, from, of, switchMap } from "rxjs";
+import { EMPTY, from, of, switchMap, catchError, tap } from "rxjs";
 import { ValidationPanelComponent } from "@components/validation-panel/validation-panel.component";
 import { ValidationItemComponent } from "@components/validation-item/validation-item.component";
 import { MatList } from "@angular/material/list";
@@ -17,14 +17,13 @@ import { CredentialConfiguration, CredentialEndpointResponse, IssuerCredentialRe
 import { JwtPayload, OpenIdMetadataResponse, RegistryEntry, OpenIdConfigResponse } from "@app/models/api-response";
 import { DataViewerComponent } from "@app/components/data-viewer/data-viewer.component";
 import { HolderKeysCardComponent } from "@components/holder/holder.component";
-import { catchError, tap } from 'rxjs/operators';
 import { OIDVCIService } from "@app/services/oidvci-service";
 import { CredentialOffer } from "@app/models/credential-offer";
 import { CryptoService } from "@app/services/crypto-service";
 import { ErrorFormatterService } from "@app/services/error-formatter-service";
 import { WalletService } from "@app/services/wallet-service";
 import { ApiService } from "@app/services/api-service";
-import { VcKeyStoreService } from "@app/services/vc-key-store.service";
+import { DpopKeyPair, VcKeyStoreService } from "@app/services/vc-key-store.service";
 import { VcStoreService } from "@app/services/vc-store.service";
 
 @Component({
@@ -91,6 +90,9 @@ export class CredentialIssuance {
 
   nonce: WritableSignal<NonceResponse | undefined> = signal(undefined);
   nonceError = signal<Record<string, any> | string | undefined>(undefined);
+
+  nonceEndpointUrl: WritableSignal<string | undefined> = signal(undefined);
+  dpopKeys: WritableSignal<DpopKeyPair | undefined> = signal(undefined);
 
   registryEntry: WritableSignal<RegistryEntry[] | undefined> = signal(undefined);
   registryEntryError = signal<Record<string, any> | string | undefined>(undefined);
@@ -183,6 +185,33 @@ export class CredentialIssuance {
           return EMPTY;
         }),
         switchMap(() => {
+          const nonceEndpointUrl = this.issuerMetadata()?.["nonce_endpoint"] as string;
+
+          if (!nonceEndpointUrl) {
+            throw new Error("Missing nonceEndpointUrl");
+          }
+
+          this.nonceEndpointUrl.set(nonceEndpointUrl);
+
+          return this.oidvciService.fetchNonce(
+            nonceEndpointUrl
+          );
+        }),
+        tap((nonce: NonceResponse) => {
+          this.nonce.set(nonce);
+          // todo only store when used
+          this.storeDpopKeys();
+        }),
+        catchError((error) => {
+          console.error(error);
+          this.nonceError.set(this.errorFormatter.format(error));
+          return EMPTY;
+        }),
+        switchMap(() => this.walletService.getOptions().useDPoP ? from(this.vcKeyStore.generateDpopKeyPair()) : of(undefined)),
+        tap((dpopKeys: DpopKeyPair | undefined) => {
+          this.dpopKeys.set(dpopKeys);
+        }),
+        switchMap(() => {
           const tokenEndpointUrl = this.openIdConfiguration()?.["token_endpoint"] as string;
           const preAuthCode = this.credentialOffer()?.grants?.['urn:ietf:params:oauth:grant-type:pre-authorized_code']?.['pre-authorized_code'] as string;
 
@@ -194,10 +223,14 @@ export class CredentialIssuance {
             throw new Error("Missing preAuthCode");
           }
 
+          console.log("this.dpopKeys", this.dpopKeys());
+
           return this.oidvciService.fetchAccessToken(
-            tokenEndpointUrl,
-            preAuthCode
-          );
+                tokenEndpointUrl,
+                this.nonceEndpointUrl()!,
+                preAuthCode,
+                this.dpopKeys() || undefined
+              )
         }),
         tap((oAuthToken: OAuthToken) => {
           this.oAuthToken.set(oAuthToken);
@@ -269,8 +302,10 @@ export class CredentialIssuance {
 
           return this.oidvciService.fetchCredential(
             credentialEndpointUrl,
+            this.nonceEndpointUrl()!,
             payload,
-            accessToken
+            accessToken,
+            this.walletService.getOptions().useDPoP ? this.dpopKeys() : undefined
           );
         }),
         switchMap((credentialResponse: CredentialEndpointResponse | string) => {
@@ -383,6 +418,12 @@ export class CredentialIssuance {
     const kid = (this.decodedHeader() as JwtPayload)?.["kid"];
 
     return verificationMethods.some((method) => (method as Record<string, unknown>)["id"] === kid);
+  }
+
+  private async storeDpopKeys(): Promise<void> {
+    console.log("Generating DPoP key pair...");
+    const keys = await this.vcKeyStore.generateDpopKeyPair();
+    this.dpopKeys.set(keys);
   }
 
   private async storeCredentialsWithKeys(credential: CredentialEndpointResponse): Promise<void> {
