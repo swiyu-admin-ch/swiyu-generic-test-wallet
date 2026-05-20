@@ -37,6 +37,7 @@ export class WalletService {
     payloadEncryptionPreference: false,
     numberOfProofs: false,
     useSignedMetadata: false,
+    useDPoP: false,
   };
 
   private walletOptions: WritableSignal<WalletOptions> = signal(
@@ -94,6 +95,14 @@ export class WalletService {
     this.walletOptions.update((options: WalletOptions) => ({
       ...options,
       numberOfProofs: value,
+    }));
+    this.saveOptions();
+  }
+
+  updateUseDpop(value: boolean): void {
+    this.walletOptions.update((options: WalletOptions) => ({
+      ...options,
+      useDPoP: value,
     }));
     this.saveOptions();
   }

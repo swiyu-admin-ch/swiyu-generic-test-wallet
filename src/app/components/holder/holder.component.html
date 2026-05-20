@@ -26,6 +26,21 @@
       <div style="margin-bottom: 12px;">
         <div style="display: flex; align-items: center; justify-content: space-between;">
           <div style="display: flex; align-items: center; gap: 4px;">
+            <span style="font-size: 13px; margin: 0;">Use DPoP</span>
+            <mat-icon matTooltip="Use DPoP for requests"
+              matTooltipPosition="above"
+              style="font-size: 14px; width: 14px; height: 14px; ">info</mat-icon>
+          </div>
+          <mat-slide-toggle [checked]="walletOptions().useDPoP"
+            (change)="onUseDPoPChange($event.checked)"
+            style="margin: 0;">
+          </mat-slide-toggle>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 12px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 4px;">
             <span style="font-size: 13px; margin: 0;">Payload Encryption Preference</span>
             <mat-icon matTooltip="Prefer payload encryption even if not enforced"
               matTooltipPosition="above"

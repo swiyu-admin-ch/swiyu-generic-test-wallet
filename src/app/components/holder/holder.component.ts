@@ -143,6 +143,11 @@ export class HolderKeysCardComponent implements OnInit {
     this.walletService.updateUseSignedMetadata(value);
   }
 
+  onDPoPChange(value: boolean): void {
+    this.walletService.updateUseDpop(value);
+  }
+
+
   copyCredentialToClipboard(sdJwt: string, credentialType: string): void {
     navigator.clipboard.writeText(sdJwt).then(() => {
       this.toastService.showSuccess(`Credential (${credentialType}) copied to clipboard`);
