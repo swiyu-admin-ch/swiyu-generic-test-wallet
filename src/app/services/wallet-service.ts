@@ -38,6 +38,7 @@ export class WalletService {
     numberOfProofs: false,
     useSignedMetadata: false,
     useDPoP: false,
+    useProtectedIssuance: false,
   };
 
   private walletOptions: WritableSignal<WalletOptions> = signal(
@@ -115,6 +116,14 @@ export class WalletService {
     this.saveOptions();
   }
 
+  updateUseProtectedIssuance(value: boolean): void {
+    this.walletOptions.update((options: WalletOptions) => ({
+      ...options,
+      useProtectedIssuance: value,
+    }));
+    this.saveOptions();
+  }
+
   resetToDefaults(): void {
     this.walletOptions.set(this.defaultOptions);
     this.saveOptions();
@@ -171,6 +180,38 @@ export class WalletService {
   }
 
   public async decodeJwt(
+    jwt: string,
+    registryEntry: Record<string, unknown>,
+  ): Promise<{ payload: JwtPayload; protectedHeader: JwtPayload }> {
+    const kid = (jose.decodeProtectedHeader(jwt) as JwtPayload)["kid"];
+    const verificationMethods = (registryEntry[
+      "state"
+    ] as any);
+
+    console.log("Decoding JWT with registry entry", { jwt, kid, verificationMethods });
+    const verificationMethod = (
+      (verificationMethods?.["verificationMethod"] as Record<
+        string,
+        unknown
+      >[]) || []
+    )
+      .map((meth) =>
+        (meth as Record<string, unknown>)["id"] === kid ? meth : null,
+      )
+      .filter(
+        (
+          meth: Record<string, unknown> | null,
+        ): meth is Record<string, unknown> => meth != null,
+      )[0];
+    const jwk = verificationMethod?.["publicKeyJwk"] as CryptoKey;
+    const { payload, protectedHeader } = await jose.jwtVerify(jwt, jwk, {});
+    return {
+      payload: payload as JwtPayload,
+      protectedHeader: protectedHeader as JwtPayload,
+    };
+  }
+
+  public async decodeJwtWithListRegistry(
     jwt: string,
     registryEntry: RegistryEntry[],
   ): Promise<{ payload: JwtPayload; protectedHeader: JwtPayload }> {

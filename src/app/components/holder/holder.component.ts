@@ -143,6 +143,10 @@ export class HolderKeysCardComponent implements OnInit {
     this.walletService.updateUseSignedMetadata(value);
   }
 
+  onUseProtectedIssuanceChange(value: boolean): void {
+    this.walletService.updateUseProtectedIssuance(value);
+  }
+
   onDPoPChange(value: boolean): void {
     this.walletService.updateUseDpop(value);
   }

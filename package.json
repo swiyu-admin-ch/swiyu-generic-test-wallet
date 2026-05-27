@@ -10,8 +10,9 @@
     "test:watch": "ng test",
     "test:coverage": "ng test --coverage",
     "lint": "ng lint",
-    "generate:apis": "npm run generate:issuer-api && npm run generate:verifier-api",
+    "generate:apis": "npm run generate:issuer-api && npm run generate:verifier-api && npm run generate:trust-api",
     "generate:issuer-api": "openapi-generator-cli generate -i openapi-spec/issuer-api.yaml -g typescript-angular -o src/generated/issuer --additional-properties=providedInRoot=true --skip-validate-spec",
+    "generate:trust-api": "openapi-generator-cli generate -i openapi-spec/trust-api.yaml -g typescript-angular -o src/generated/trust --additional-properties=providedInRoot=true --skip-validate-spec",
     "generate:verifier-api": "openapi-generator-cli generate -i openapi-spec/verifier-api.yaml -g typescript-angular -o src/generated/verifier --additional-properties=providedInRoot=true --skip-validate-spec",
     "clean:generated": "rm -rf src/generated"
   },
@@ -31,6 +32,7 @@
     "material-icons": "^1.13.14",
     "rxjs": "^7.8.0",
     "service": "^0.1.4",
+    "uuid": "^14.0.0",
     "zone.js": "^0.16.2"
   },
   "devDependencies": {
