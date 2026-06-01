@@ -47,7 +47,10 @@ import {
 } from "@app/services/vc-key-store.service";
 import { VcStoreService } from "@app/services/vc-store.service";
 import { TrustService } from "@app/services/trust-service";
-import { TrustStatement } from "@app/services/trust-statement-verifier.model";
+import {
+  TrustMarkers,
+  TrustStatement,
+} from "@app/services/trust-statement-verifier.model";
 import { TrustStatementVerifierService } from "@app/services/trust-statement-verifier.service";
 import { StatusService } from "@app/services/status-service";
 
@@ -112,6 +115,7 @@ export class CredentialIssuance {
     undefined,
   );
   decodedIdTS: WritableSignal<TrustStatement | undefined> = signal(undefined);
+  trustMarkers: WritableSignal<TrustMarkers | undefined> = signal(undefined);
 
   trustStatements: WritableSignal<
     { idTS: TrustStatement | undefined; ncTLS: string | undefined } | undefined
@@ -581,7 +585,7 @@ export class CredentialIssuance {
               ),
             },
           );
-          const bla =
+          const verifiedIssuerStatements =
             this.trustStatementVerifierService.verifyIssuanceStatements(
               trustRoot,
               this.issuerMetadata()?.iss,
@@ -592,9 +596,11 @@ export class CredentialIssuance {
 
           console.log(
             "Trust verification result:",
-            bla.markers,
-            bla.markers.isTrustedIssuer(),
+            verifiedIssuerStatements.markers,
+            verifiedIssuerStatements.markers.isTrustedIssuer(),
           );
+          this.trustMarkers.set(verifiedIssuerStatements.markers);
+          this.trustMarkers()?.isTrustedIssuer()
         }),
       )
       .subscribe(() => {
