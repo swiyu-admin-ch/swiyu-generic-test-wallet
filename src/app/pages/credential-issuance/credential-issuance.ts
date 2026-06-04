@@ -321,7 +321,7 @@ export class CredentialIssuance {
             );
           }
 
-          return from(
+          return of(
             this.issuerMetadata()
               .credential_issuer_identity_trust_statement as string,
           );
@@ -600,7 +600,7 @@ export class CredentialIssuance {
             verifiedIssuerStatements.markers.isTrustedIssuer(),
           );
           this.trustMarkers.set(verifiedIssuerStatements.markers);
-          this.trustMarkers()?.isTrustedIssuer()
+          this.trustMarkers()?.isTrustedIssuer();
         }),
       )
       .subscribe(() => {

@@ -16,12 +16,24 @@ import { SdJwtStoreService } from "@services/sd-jwt-store.service";
 import { VcKeyStoreService } from "@services/vc-key-store.service";
 import { VcStoreService } from "@services/vc-store.service";
 import { Router } from "@angular/router";
-import { DcqlClaimDto, DcqlCredentialDto, DcqlQueryDto, RequestObject } from "src/generated/verifier";
+import {
+  DcqlClaimDto,
+  DcqlCredentialDto,
+  DcqlQueryDto,
+  RequestObject,
+} from "src/generated/verifier";
 import { JwtPayload } from "@app/models/api-response";
 import { DataViewerComponent } from "@app/components/data-viewer/data-viewer.component";
 import { OIDVPService } from "@services/oidvp-service";
 import { CryptoService } from "@services/crypto-service";
 import { ErrorFormatterService } from "@services/error-formatter-service";
+import { TrustStatement } from "@app/services/trust-statement-verifier.model";
+import { VerifierInfoObjectDto } from "src/generated/verifier/model/verifierInfoDto";
+import {
+  TrustService,
+  VerificationTrustStatementsResult,
+} from "@app/services/trust-service";
+import { PagedModelString } from "src/generated/trust/model/models";
 
 type PayloadEncryptionStatus = {
   responseMode: string | undefined;
@@ -59,6 +71,7 @@ export class CredentialVerification {
   private router = inject(Router);
   private cryptoService = inject(CryptoService);
   private errorFormatter = inject(ErrorFormatterService);
+  private trustService = inject(TrustService);
 
   sdJwt = this.sdJwtStore.getVerificationSdJwt();
 
@@ -73,32 +86,56 @@ export class CredentialVerification {
   decodedHeader: WritableSignal<JwtPayload | undefined> = signal(undefined);
   decodedPayload: WritableSignal<JwtPayload | undefined> = signal(undefined);
 
-  deeplink: WritableSignal<Record<string, string> | undefined> = signal(undefined);
+  deeplink: WritableSignal<Record<string, string> | undefined> =
+    signal(undefined);
   deeplinkError = signal<Record<string, any> | string | undefined>(undefined);
 
-  requestObjectResponse: WritableSignal<RequestObject | string | undefined> = signal(undefined);
+  requestObjectResponse: WritableSignal<RequestObject | string | undefined> =
+    signal(undefined);
   requestObject: WritableSignal<RequestObject | undefined> = signal(undefined);
-  requestObjectError = signal<Record<string, any> | string | undefined>(undefined);
+  requestObjectError = signal<Record<string, any> | string | undefined>(
+    undefined,
+  );
 
   dcqlQuery: WritableSignal<DcqlQueryDto | undefined> = signal(undefined);
   dcqlQueryError = signal<Record<string, any> | string | undefined>(undefined);
 
-  requiredCredentials: WritableSignal<DcqlCredentialDto[] | undefined> = signal(undefined);
-  requiredCredentialsError = signal<Record<string, any> | string | undefined>(undefined);
+  requiredCredentials: WritableSignal<DcqlCredentialDto[] | undefined> =
+    signal(undefined);
+  requiredCredentialsError = signal<Record<string, any> | string | undefined>(
+    undefined,
+  );
 
-  payloadEncryption: WritableSignal<PayloadEncryptionStatus | undefined> = signal(undefined);
-  payloadEncryptionError = signal<Record<string, any> | string | undefined>(undefined);
+  payloadEncryption: WritableSignal<PayloadEncryptionStatus | undefined> =
+    signal(undefined);
+  payloadEncryptionError = signal<Record<string, any> | string | undefined>(
+    undefined,
+  );
 
   vpToken: WritableSignal<string | undefined> = signal(undefined);
   vpTokenError = signal<Record<string, any> | string | undefined>(undefined);
 
   verificationResponse: WritableSignal<string | undefined> = signal(undefined);
-  verificationResponseSubmitted: WritableSignal<boolean | undefined> = signal(undefined);
-  verificationResponseError = signal<Record<string, any> | string | undefined>(undefined);
+  verificationResponseSubmitted: WritableSignal<boolean | undefined> =
+    signal(undefined);
+  verificationResponseError = signal<Record<string, any> | string | undefined>(
+    undefined,
+  );
+
+  trustStatements: WritableSignal<
+    | {
+        idTS?: VerifierInfoObjectDto[] | undefined;
+        idTSDecoded?: TrustStatement | undefined;
+        pvaTS?: String | undefined;
+      }
+    | undefined
+  > = signal(undefined);
 
   constructor() {
     const navigation = this.router.getCurrentNavigation();
-    const credential = navigation?.extras?.state?.["credential"] as string | undefined;
+    const credential = navigation?.extras?.state?.["credential"] as
+      | string
+      | undefined;
     if (credential) {
       this.credentialInput.set(credential);
     }
@@ -123,7 +160,8 @@ export class CredentialVerification {
         }),
         switchMap(() => of(input)),
         tap((deeplinkInput: string) => {
-          const deeplink = this.verificationService.decodeDeeplink(deeplinkInput);
+          const deeplink =
+            this.verificationService.decodeDeeplink(deeplinkInput);
           this.deeplink.set(deeplink);
         }),
         catchError((error) => {
@@ -140,7 +178,20 @@ export class CredentialVerification {
         }),
         tap((requestObjectResponse: RequestObject | string) => {
           this.requestObjectResponse.set(requestObjectResponse);
-          this.requestObject.set(this.cryptoService.decodeIfJwt<RequestObject>(requestObjectResponse));
+          this.requestObject.set(
+            this.cryptoService.decodeIfJwt<RequestObject>(
+              requestObjectResponse,
+            ),
+          );
+          this.trustStatements.update((current) => ({
+            ...current,
+            idTS: this.requestObject()?.verifier_info,
+            idTSDecoded: this.cryptoService.decodeIfJwt<TrustStatement>(
+              this.requestObject()?.verifier_info?.at(0)?.data as
+                | string
+                | TrustStatement,
+            ),
+          }));
         }),
         catchError((error) => {
           this.requestObjectError.set(this.errorFormatter.format(error));
@@ -158,7 +209,13 @@ export class CredentialVerification {
           this.dcqlQueryError.set(this.errorFormatter.format(error));
           return EMPTY;
         }),
-        switchMap(() => of(this.verificationService.extractCredentialsFromDCQL(this.dcqlQuery()!))),
+        switchMap(() =>
+          of(
+            this.verificationService.extractCredentialsFromDCQL(
+              this.dcqlQuery()!,
+            ),
+          ),
+        ),
         tap((requiredCredentials: DcqlCredentialDto[]) => {
           if (requiredCredentials.length === 0) {
             throw new Error("DCQL query does not request any credentials");
@@ -170,7 +227,9 @@ export class CredentialVerification {
           this.requiredCredentialsError.set(this.errorFormatter.format(error));
           return EMPTY;
         }),
-        switchMap(() => of(this.extractPayloadEncryptionStatus(this.requestObject()!))),
+        switchMap(() =>
+          of(this.extractPayloadEncryptionStatus(this.requestObject()!)),
+        ),
         tap((payloadEncryption: PayloadEncryptionStatus) => {
           this.payloadEncryption.set(payloadEncryption);
         }),
@@ -179,13 +238,22 @@ export class CredentialVerification {
           return EMPTY;
         }),
         switchMap(() =>
+          this.trustService.getVerificationTrustStatements(
+            this.requestObject()?.client_id as string,
+          ),
+        ),
+        tap((trustStatements: VerificationTrustStatementsResult) => {
+          console.log("Fetched trust statements", trustStatements);
+        }),
+
+        switchMap(() =>
           from(
             this.createAndSignPresentation(
               this.credential()!,
               this.requestObject()?.client_id as string,
-              this.requestObject()?.nonce as string
-            )
-          )
+              this.requestObject()?.nonce as string,
+            ),
+          ),
         ),
         tap((vpToken: string) => {
           this.vpToken.set(vpToken);
@@ -201,7 +269,7 @@ export class CredentialVerification {
           return this.oidvpService.submitVerificationResponse(
             this.requestObject()!,
             this.vpToken()!,
-            credentialId
+            credentialId,
           );
         }),
         tap((response: string) => {
@@ -210,9 +278,11 @@ export class CredentialVerification {
         }),
         catchError((error) => {
           this.verificationResponseSubmitted.set(false);
-          this.verificationResponseError.set(this.errorFormatter.formatRequestError(error, "POST"));
+          this.verificationResponseError.set(
+            this.errorFormatter.formatRequestError(error, "POST"),
+          );
           return EMPTY;
-        })
+        }),
       )
       .subscribe();
   }
@@ -240,7 +310,9 @@ export class CredentialVerification {
     this.verificationResponseError.set(undefined);
   }
 
-  public extractClaimsFromDcqlQuery(dcqlQuery: DcqlQueryDto | undefined): DcqlClaimDto[] {
+  public extractClaimsFromDcqlQuery(
+    dcqlQuery: DcqlQueryDto | undefined,
+  ): DcqlClaimDto[] {
     if (!dcqlQuery?.credentials) {
       return [];
     }
@@ -284,34 +356,49 @@ export class CredentialVerification {
       throw new Error("Invalid JWT format: expected 3 components");
     }
 
-    const headerJson = JSON.parse(new TextDecoder().decode(this.base64UrlDecode(jwtComponents[0])));
-    const payloadJson = JSON.parse(new TextDecoder().decode(this.base64UrlDecode(jwtComponents[1])));
+    const headerJson = JSON.parse(
+      new TextDecoder().decode(this.base64UrlDecode(jwtComponents[0])),
+    );
+    const payloadJson = JSON.parse(
+      new TextDecoder().decode(this.base64UrlDecode(jwtComponents[1])),
+    );
 
     this.decodedHeader.set(headerJson);
     this.decodedPayload.set(payloadJson);
   }
 
-  private extractPayloadEncryptionStatus(requestObject: RequestObject): PayloadEncryptionStatus {
+  private extractPayloadEncryptionStatus(
+    requestObject: RequestObject,
+  ): PayloadEncryptionStatus {
     const required = requestObject.response_mode === "direct_post.jwt";
 
     if (required && !requestObject.client_metadata?.jwks?.keys?.length) {
-      throw new Error("Payload encryption is required but verifier encryption JWKs are missing");
+      throw new Error(
+        "Payload encryption is required but verifier encryption JWKs are missing",
+      );
     }
 
-    if (required && !requestObject.client_metadata?.encrypted_response_enc_values_supported?.length) {
-      throw new Error("Payload encryption is required but supported encryption methods are missing");
+    if (
+      required &&
+      !requestObject.client_metadata?.encrypted_response_enc_values_supported
+        ?.length
+    ) {
+      throw new Error(
+        "Payload encryption is required but supported encryption methods are missing",
+      );
     }
 
     return {
       responseMode: requestObject.response_mode,
       required,
       jwks: requestObject.client_metadata?.jwks,
-      encValuesSupported: requestObject.client_metadata?.encrypted_response_enc_values_supported,
+      encValuesSupported:
+        requestObject.client_metadata?.encrypted_response_enc_values_supported,
     };
   }
 
   private base64UrlDecode(input: string): Uint8Array {
-    const padded = input + "==".substring(0, (4 - input.length % 4) % 4);
+    const padded = input + "==".substring(0, (4 - (input.length % 4)) % 4);
     const binary = atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) {
@@ -323,7 +410,7 @@ export class CredentialVerification {
   private async createAndSignPresentation(
     credentialString: string,
     verifierId: string,
-    nonce: string
+    nonce: string,
   ): Promise<string> {
     if (!verifierId) {
       throw new Error("Missing verifier client_id");
@@ -335,13 +422,22 @@ export class CredentialVerification {
 
     const requiredFields = this.extractClaimsFromDcqlQuery(this.dcqlQuery());
     const payloadJson = this.extractPayloadFromSdJwt(credentialString);
-    const validationErrors = this.validateRequiredFields(requiredFields, payloadJson, credentialString);
+    const validationErrors = this.validateRequiredFields(
+      requiredFields,
+      payloadJson,
+      credentialString,
+    );
 
     if (validationErrors.length > 0) {
-      throw new Error(`Missing required fields: ${validationErrors.join(", ")}`);
+      throw new Error(
+        `Missing required fields: ${validationErrors.join(", ")}`,
+      );
     }
 
-    const selectiveDisclosureSdJwt = await this.createSelectiveDisclosureSdJwt(credentialString, requiredFields);
+    const selectiveDisclosureSdJwt = await this.createSelectiveDisclosureSdJwt(
+      credentialString,
+      requiredFields,
+    );
     const sdHash = await this.calculateSdHash(selectiveDisclosureSdJwt);
     const holderKeyPair = this.findCredentialKeyPair(credentialString);
 
@@ -361,7 +457,10 @@ export class CredentialVerification {
     return `${selectiveDisclosureSdJwt}${kbJwt}`;
   }
 
-  private findCredentialKeyPair(credentialString: string): { privateKey: CryptoKey; jwk: JWK } {
+  private findCredentialKeyPair(credentialString: string): {
+    privateKey: CryptoKey;
+    jwk: JWK;
+  } {
     const storedVCs = this.vcStore.getAllVcs();
 
     for (const vc of storedVCs) {
@@ -392,7 +491,7 @@ export class CredentialVerification {
 
   private async createSelectiveDisclosureSdJwt(
     fullSdJwt: string,
-    requiredFields: DcqlClaimDto[]
+    requiredFields: DcqlClaimDto[],
   ): Promise<string> {
     const disclosureExcluded = new Set(["iss", "nbf", "exp", "cnf", "status"]);
     const requiredClaimNames = this.extractRequiredClaimNames(requiredFields);
@@ -409,13 +508,12 @@ export class CredentialVerification {
       const decodedDisclosure = this.decodeDisclosure(disclosure);
       const claimName = decodedDisclosure?.[1];
 
-      if (typeof claimName !== "string" || disclosureExcluded.has(claimName)) {
+      if (typeof claimName === "string" && disclosureExcluded.has(claimName)) {
         return;
       }
 
-      if (requiredClaimNames.has(claimName)) {
-        selectedDisclosures.push(disclosure);
-      }
+      // TODO fix for recursive
+      selectedDisclosures.push(disclosure);
     });
 
     if (selectedDisclosures.length === 0) {
@@ -428,13 +526,15 @@ export class CredentialVerification {
   private extractPayloadFromSdJwt(sdJwt: string): Record<string, unknown> {
     const jwtPart = sdJwt.split("~")[0];
     const [, payloadB64] = jwtPart.split(".");
-    return JSON.parse(new TextDecoder().decode(this.base64UrlDecode(payloadB64))) as Record<string, unknown>;
+    return JSON.parse(
+      new TextDecoder().decode(this.base64UrlDecode(payloadB64)),
+    ) as Record<string, unknown>;
   }
 
   private validateRequiredFields(
     requiredFields: DcqlClaimDto[],
     payloadJson: Record<string, unknown>,
-    sdJwt: string
+    sdJwt: string,
   ): string[] {
     const requiredClaimNames = this.extractRequiredClaimNames(requiredFields);
     const disclosedClaimNames = this.extractDisclosureClaimNames(sdJwt);
@@ -444,8 +544,17 @@ export class CredentialVerification {
     });
   }
 
-  private extractRequiredClaimNames(requiredFields: DcqlClaimDto[]): Set<string> {
-    const reservedClaims = new Set(["iss", "nbf", "exp", "cnf", "vct", "status"]);
+  private extractRequiredClaimNames(
+    requiredFields: DcqlClaimDto[],
+  ): Set<string> {
+    const reservedClaims = new Set([
+      "iss",
+      "nbf",
+      "exp",
+      "cnf",
+      "vct",
+      "status",
+    ]);
     const claimNames = requiredFields
       .flatMap((claim) => (Array.isArray(claim.path) ? claim.path : []))
       .filter((claimName): claimName is string => typeof claimName === "string")
@@ -458,14 +567,18 @@ export class CredentialVerification {
     const disclosures = sdJwt.split("~").slice(1, -1);
     const claimNames = disclosures
       .map((disclosure) => this.decodeDisclosure(disclosure)?.[1])
-      .filter((claimName): claimName is string => typeof claimName === "string");
+      .filter(
+        (claimName): claimName is string => typeof claimName === "string",
+      );
 
     return new Set(claimNames);
   }
 
   private decodeDisclosure(disclosure: string): unknown[] | undefined {
     try {
-      const decoded = JSON.parse(new TextDecoder().decode(this.base64UrlDecode(disclosure)));
+      const decoded = JSON.parse(
+        new TextDecoder().decode(this.base64UrlDecode(disclosure)),
+      );
       return Array.isArray(decoded) ? decoded : undefined;
     } catch {
       return undefined;
