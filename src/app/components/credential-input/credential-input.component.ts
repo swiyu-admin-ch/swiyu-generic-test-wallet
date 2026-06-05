@@ -18,6 +18,8 @@ import { Router } from "@angular/router";
 import { JwtPayload, RegistryEntry } from "@app/models/api-response";
 import { ToastService } from "@app/services/toast.service";
 
+type Disclosure = [string, unknown] | [string, string, unknown];
+
 @Component({
   selector: "app-credential-input",
   standalone: true,
@@ -27,7 +29,7 @@ import { ToastService } from "@app/services/toast.service";
     CommonModule,
     FormsModule,
     MatButton,
-    MatLabel
+    MatLabel,
   ],
   templateUrl: "./credential-input.component.html",
   styleUrl: "./credential-input.component.css",
@@ -42,7 +44,7 @@ export class Credential implements OnChanges {
 
   decodedHeader: WritableSignal<JwtPayload | undefined> = signal(undefined);
   decodedPayload: WritableSignal<JwtPayload | undefined> = signal(undefined);
-  disclosures: WritableSignal<Record<string, unknown>[]> = signal([]);
+  disclosures: WritableSignal<Disclosure[]> = signal([]);
 
   async getCredentialDetails(): Promise<void> {
     if (!this.encodedCredential) {
@@ -56,25 +58,36 @@ export class Credential implements OnChanges {
     }
 
     try {
-      const decodedHeader = (await jose.decodeProtectedHeader(token[0])) as JwtPayload;
+      const decodedHeader = (await jose.decodeProtectedHeader(
+        token[0],
+      )) as JwtPayload;
 
       if (this.registryEntry && this.registryEntry.length > 0) {
         const registryValue = this.registryEntry[3] as Record<string, unknown>;
-        const verificationMethods = (registryValue?.["value"] as Record<string, unknown>)?.["verificationMethod"] as Record<string, unknown>[];
+        const verificationMethods = (
+          registryValue?.["value"] as Record<string, unknown>
+        )?.["verificationMethod"] as Record<string, unknown>[];
 
         if (verificationMethods && verificationMethods.length > 0) {
-          const verificationMethod =
-            verificationMethods
-              .map((verificationMethod: Record<string, unknown>) =>
-                verificationMethod["id"] === decodedHeader["kid"]
-                  ? verificationMethod
-                  : null
-              )
-              .filter((verificationMethod: Record<string, unknown> | null): verificationMethod is Record<string, unknown> => verificationMethod != null)[0];
+          const verificationMethod = verificationMethods
+            .map((verificationMethod: Record<string, unknown>) =>
+              verificationMethod["id"] === decodedHeader["kid"]
+                ? verificationMethod
+                : null,
+            )
+            .filter(
+              (
+                verificationMethod: Record<string, unknown> | null,
+              ): verificationMethod is Record<string, unknown> =>
+                verificationMethod != null,
+            )[0];
 
           if (verificationMethod) {
             const jwk = verificationMethod?.["publicKeyJwk"];
-            const { payload, protectedHeader } = await jose.jwtVerify(token[0], jwk as CryptoKey);
+            const { payload, protectedHeader } = await jose.jwtVerify(
+              token[0],
+              jwk as CryptoKey,
+            );
             this.decodedHeader.set(protectedHeader as JwtPayload);
             this.decodedPayload.set(payload as JwtPayload);
           } else {
@@ -87,28 +100,33 @@ export class Credential implements OnChanges {
         this.decodeWithoutVerification(token, decodedHeader);
       }
 
-      const disclosures: Record<string, unknown>[] = [];
+      const disclosures: Disclosure[] = [];
       for (let i = 1; i < token.length - 1; i++) {
         try {
-          disclosures.push(JSON.parse(this.base64UrlDecode(token[i])) as Record<string, unknown>);
+          disclosures.push(
+            JSON.parse(this.base64UrlDecode(token[i])) as Disclosure,
+          );
         } catch (e) {
-          console.error('Error decoding disclosure', e);
+          console.error("Error decoding disclosure", e);
         }
       }
       this.disclosures.set(disclosures);
     } catch (error) {
-      console.error('Error decoding credential', error);
+      console.error("Error decoding credential", error);
       this.clearCredentialDetails();
     }
   }
 
-  private decodeWithoutVerification(token: string[], decodedHeader: JwtPayload): void {
+  private decodeWithoutVerification(
+    token: string[],
+    decodedHeader: JwtPayload,
+  ): void {
     try {
       const decodedPayload = jose.decodeJwt(token[0]) as JwtPayload;
       this.decodedHeader.set(decodedHeader);
       this.decodedPayload.set(decodedPayload);
     } catch (error) {
-      console.error('Error decoding payload', error);
+      console.error("Error decoding payload", error);
     }
   }
 
@@ -133,8 +151,22 @@ export class Credential implements OnChanges {
     this.getCredentialDetails();
   }
 
-  public getDisclosureEntries(disclosure: Record<string, unknown>[]): Record<string, unknown>[] {
-    return disclosure;
+  public isStructuredDisclosureValue(value: unknown): boolean {
+    return typeof value === "object" && value !== null;
+  }
+
+  public formatDisclosureValue(value: unknown): string {
+    return this.isStructuredDisclosureValue(value)
+      ? JSON.stringify(value, null, 1)
+      : String(value);
+  }
+
+  public getDisclosureKey(disclosure: Disclosure): string | undefined {
+    return disclosure.length === 3 ? String(disclosure[1]) : undefined;
+  }
+
+  public getDisclosureValue(disclosure: Disclosure): unknown {
+    return disclosure.length === 3 ? disclosure[2] : disclosure[1];
   }
 
   private base64UrlDecode(input: string): string {
@@ -153,15 +185,17 @@ export class Credential implements OnChanges {
           this.toastService.showSuccess("SD-JWT VCI copied to the clipboard");
         },
         () => {
-          this.toastService.showError("Failed to copy the SD-JWT VCI to the clipboard");
-        }
+          this.toastService.showError(
+            "Failed to copy the SD-JWT VCI to the clipboard",
+          );
+        },
       );
     }
   }
 
   public goToVerification(): void {
     this.router.navigate(["/verification"], {
-      state: { credential: this.encodedCredential }
+      state: { credential: this.encodedCredential },
     });
   }
 }

@@ -34,10 +34,10 @@ export class WalletService {
 
   private readonly STORAGE_KEY = "wallet_options";
   private readonly defaultOptions: WalletOptions = {
-    payloadEncryptionPreference: false,
+    payloadEncryptionPreference: true,
     numberOfProofs: false,
-    useSignedMetadata: false,
-    useDPoP: false,
+    useSignedMetadata: true,
+    useDPoP: true,
     useProtectedIssuance: false,
   };
 
