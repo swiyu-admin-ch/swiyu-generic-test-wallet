@@ -120,9 +120,6 @@ export class TrustStatementVerifierService {
       publicKeySet,
       verifiedStatusListTokens,
     );
-
-    console.log("Valid statements:", validStatements);
-
     const markers = this.processCommonTrust(validStatements, actorDid);
     this.finalizeIssuerTrust(markers, validStatements, vct);
 

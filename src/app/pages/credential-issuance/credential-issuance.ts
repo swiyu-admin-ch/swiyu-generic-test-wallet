@@ -118,7 +118,15 @@ export class CredentialIssuance {
   trustMarkers: WritableSignal<TrustMarkers | undefined> = signal(undefined);
 
   trustStatements: WritableSignal<
-    { idTS: TrustStatement | undefined; ncTLS: string | undefined } | undefined
+    | {
+        idTS?: string;
+        idTSDecoded?: TrustStatement;
+        ncTLS?: string;
+        ncTLSDecoded?: TrustStatement;
+        piTLS?: string;
+        piTLSDecoded?: TrustStatement;
+      }
+    | undefined
   > = signal(undefined);
 
   public issuerMetadataResponseJwtHeader = computed<JwtPayload | undefined>(
@@ -172,7 +180,7 @@ export class CredentialIssuance {
   public issuerMetadataKidMatchesSub = computed(() => {
     const header = this.issuerMetadataResponseJwtHeader();
     const kid = header?.["kid"] as string;
-    const sub = this.decodedIdTS()?.sub;
+    const sub = this.trustStatements()?.idTSDecoded?.sub;
 
     if (!kid || !sub) {
       return false;
@@ -313,12 +321,15 @@ export class CredentialIssuance {
           if (
             this.issuerMetadata().credential_issuer_identity_trust_statement
           ) {
-            this.decodedIdTS.set(
-              this.cryptoService.decodeIfJwt<TrustStatement>(
-                this.issuerMetadata()
+            this.trustStatements.update((current) => ({
+              ...current,
+              idTS: this.issuerMetadata()!
+                .credential_issuer_identity_trust_statement,
+              idTSDecoded: this.cryptoService.decodeIfJwt<TrustStatement>(
+                this.issuerMetadata()!
                   .credential_issuer_identity_trust_statement,
               ),
-            );
+            }));
           }
 
           return of(
@@ -337,6 +348,7 @@ export class CredentialIssuance {
           }
         }),
         switchMap(() => {
+          console.log("s", this.decodedIdTS());
           const credentialIssuerUrl = this.issuerMetadata()?.credential_issuer;
           if (!credentialIssuerUrl) {
             throw new Error("Missing credential_issuer");
@@ -523,21 +535,20 @@ export class CredentialIssuance {
           return EMPTY;
         }),
         switchMap(() => {
-          return this.trustService.fetchNcTLS();
+          return this.trustService.getIssuanceTrustStatements();
         }),
-        switchMap((ncTLS) => {
-          if (ncTLS instanceof Blob) {
-            return ncTLS.text();
-          }
-          return of(ncTLS);
-        }),
-        tap((ncTLS) => {
-          this.trustStatements.set({
-            idTS: this.issuerMetadata()
-              .credential_issuer_identity_trust_statement,
-            ncTLS: ncTLS,
-          });
-          console.log("Fetched ncTLS:", this.trustStatements());
+        tap((response) => {
+          this.trustStatements.update((current) => ({
+            ...current,
+            ncTLS: response.ncTLS,
+            ncTLSDecoded: this.cryptoService.decodeIfJwt<TrustStatement>(
+              response.ncTLS,
+            ),
+            piTLS: response.piTLS,
+            piTLSDecoded: this.cryptoService.decodeIfJwt<TrustStatement>(
+              response.piTLS,
+            ),
+          }));
         }),
         switchMap(() => {
           const credential =
@@ -573,11 +584,12 @@ export class CredentialIssuance {
         ),
         tap((statuslistEntry) => {
           const trustRoot =
-            "did:webvh:QmXQaT89Me5tkAMLnczovBFvSXcrnwMgkeKVYtsJQQjLQa:identifier-reg-a.trust-infra.swiyu-int.admin.ch:api:v1:did:3095ec63-b9ae-4fc4-8d70-6978a332947c";
+            "did:webvh:QmQNMXCBYHLsH5zJeE1hC6tn7GpQFfvqJaWPqwpn7pafcy:identifier-reg-a.trust-infra.swiyu-int.admin.ch:api:v1:did:3d20b010-8d39-4cdd-b5cd-a6356b4e1218";
           this.trustStatementVerifierService.initialize(
             [
-              this.issuerMetadata()?.credential_issuer_identity_trust_statement,
-              this.trustStatements()?.ncTLS,
+              this.trustStatements()?.idTS!,
+              this.trustStatements()?.ncTLS!,
+              this.trustStatements()?.piTLS!,
             ],
             {
               allowedHosts: new Set(
@@ -588,17 +600,12 @@ export class CredentialIssuance {
           const verifiedIssuerStatements =
             this.trustStatementVerifierService.verifyIssuanceStatements(
               trustRoot,
-              this.issuerMetadata()?.iss,
+              this.issuerMetadata()?.iss?.split("#")[0] as string,
               this.decodedPayload()!["vct"] as string,
               { test: this.registryEntry()?.toString() },
               statuslistEntry,
             );
 
-          console.log(
-            "Trust verification result:",
-            verifiedIssuerStatements.markers,
-            verifiedIssuerStatements.markers.isTrustedIssuer(),
-          );
           this.trustMarkers.set(verifiedIssuerStatements.markers);
           this.trustMarkers()?.isTrustedIssuer();
         }),
@@ -658,12 +665,7 @@ export class CredentialIssuance {
     this.trustStatements.set(undefined);
   }
 
-  // public async checkIfKeysmatch(): Promise<boolean> {
-  //   const decodedHeader = (await jose.decodeProtectedHeader(this.credential()?.credentials?.[0]?.credential)) as JwtPayload;
-  //   return true;
-  // }
-
-  public checkIfKeyPresent(): boolean {
+  public checkIfKeyPresent = computed(() => {
     if (!this.registryEntry()) {
       return false;
     }
@@ -680,10 +682,12 @@ export class CredentialIssuance {
 
     const kid = (this.decodedHeader() as JwtPayload)?.["kid"];
 
+    console.log("verificationMethods", kid, verificationMethods);
+
     return verificationMethods.some(
       (method) => (method as Record<string, unknown>)["id"] === kid,
     );
-  }
+  });
 
   private decodeBase64Url(input: string): string {
     const normalized = input.replace(/-/g, "+").replace(/_/g, "/");

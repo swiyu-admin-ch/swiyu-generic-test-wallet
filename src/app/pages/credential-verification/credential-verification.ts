@@ -15,6 +15,7 @@ import { HolderKeyService } from "@services/holder-key.service";
 import { SdJwtStoreService } from "@services/sd-jwt-store.service";
 import { VcKeyStoreService } from "@services/vc-key-store.service";
 import { VcStoreService } from "@services/vc-store.service";
+import { TrustStatementVerifierService } from "@app/services/trust-statement-verifier.service";
 import { Router } from "@angular/router";
 import {
   DcqlClaimDto,
@@ -27,7 +28,10 @@ import { DataViewerComponent } from "@app/components/data-viewer/data-viewer.com
 import { OIDVPService } from "@services/oidvp-service";
 import { CryptoService } from "@services/crypto-service";
 import { ErrorFormatterService } from "@services/error-formatter-service";
-import { TrustStatement } from "@app/services/trust-statement-verifier.model";
+import {
+  TrustMarkers,
+  TrustStatement,
+} from "@app/services/trust-statement-verifier.model";
 import { VerifierInfoObjectDto } from "src/generated/verifier/model/verifierInfoDto";
 import {
   TrustService,
@@ -72,7 +76,7 @@ export class CredentialVerification {
   private cryptoService = inject(CryptoService);
   private errorFormatter = inject(ErrorFormatterService);
   private trustService = inject(TrustService);
-
+  private trustStatementVerifierService = inject(TrustStatementVerifierService);
   sdJwt = this.sdJwtStore.getVerificationSdJwt();
 
   readonly panelOpenState = signal(false);
@@ -124,9 +128,13 @@ export class CredentialVerification {
 
   trustStatements: WritableSignal<
     | {
-        idTS?: VerifierInfoObjectDto[] | undefined;
+        idTS?: string;
         idTSDecoded?: TrustStatement | undefined;
-        pvaTS?: String | undefined;
+        pvaTS?: string | undefined;
+        pvaTSDecoded?: TrustStatement | undefined;
+        ncTLS?: string;
+        ncTLSDecoded?: TrustStatement;
+        markers?: TrustMarkers;
       }
     | undefined
   > = signal(undefined);
@@ -185,7 +193,7 @@ export class CredentialVerification {
           );
           this.trustStatements.update((current) => ({
             ...current,
-            idTS: this.requestObject()?.verifier_info,
+            idTS: this.requestObject()?.verifier_info?.at(0)?.data,
             idTSDecoded: this.cryptoService.decodeIfJwt<TrustStatement>(
               this.requestObject()?.verifier_info?.at(0)?.data as
                 | string
@@ -242,8 +250,55 @@ export class CredentialVerification {
             this.requestObject()?.client_id as string,
           ),
         ),
-        tap((trustStatements: VerificationTrustStatementsResult) => {
-          console.log("Fetched trust statements", trustStatements);
+        tap((response) => {
+          this.trustStatements.update((current) => ({
+            ...current,
+            ncTLS: response.ncTLS,
+            ncTLSDecoded: this.cryptoService.decodeIfJwt<TrustStatement>(
+              response.ncTLS,
+            ),
+            pvaTS: response.pvaTS,
+            pvaTSDecoded: this.cryptoService.decodeIfJwt<TrustStatement>(
+              response.pvaTS,
+            ),
+          }));
+        }),
+        tap(() => {
+          const trustRoot =
+            "did:webvh:QmQNMXCBYHLsH5zJeE1hC6tn7GpQFfvqJaWPqwpn7pafcy:identifier-reg-a.trust-infra.swiyu-int.admin.ch:api:v1:did:3d20b010-8d39-4cdd-b5cd-a6356b4e1218";
+          const statements = [
+            this.trustStatements()?.idTS!,
+            this.trustStatements()?.ncTLS!,
+            this.trustStatements()?.pvaTS!,
+          ];
+          this.trustStatementVerifierService.initialize(statements, {
+            allowedHosts: new Set(
+              "trust-data-service-int-a.apps.p-szb-ros-shrd-npr-01.cloud.admin.ch",
+            ),
+          });
+          const verifiedIssuerStatements =
+            this.trustStatementVerifierService.verifyVerifierStatements(
+              trustRoot,
+              this.trustStatements()?.pvaTSDecoded?.iss!,
+              this.requestObject()?.iss?.toString() ?? "",
+              { test: "" },
+              [
+                {
+                  sub: "test",
+                  statusList: {
+                    statusListData: "Test",
+                    bits: 1,
+                  },
+                },
+              ],
+            );
+
+          console.log("markers", verifiedIssuerStatements.markers);
+
+          this.trustStatements.update((current) => ({
+            ...current,
+            markers: verifiedIssuerStatements.markers,
+          }));
         }),
 
         switchMap(() =>

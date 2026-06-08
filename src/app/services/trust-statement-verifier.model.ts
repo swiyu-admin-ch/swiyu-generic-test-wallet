@@ -10,10 +10,10 @@ export interface Statement {
 
 export enum StatementType {
   IDENTITY_TRUST_STATEMENT = "swiyu-identity-trust-statement+jwt",
-  PROTECTED_ISSUANCE_TRUST_LIST_STATEMENT = "piTLS",
-  PROTECTED_ISSUANCE_AUTHORIZATION_TRUST_STATEMENT = "piaTS",
-  PROTECTED_VERIFICATION_AUTHORIZATION_TRUST_STATEMENT = "pvaTS",
-  VERIFICATION_QUERY_PUBLIC_STATEMENT = "vqPS",
+  PROTECTED_ISSUANCE_TRUST_LIST_STATEMENT = "swiyu-protected-issuance-trust-list-statement+jwt",
+  PROTECTED_ISSUANCE_AUTHORIZATION_TRUST_STATEMENT = "swiyu-protected-issuance-authorization-trust-statement+jwt",
+  PROTECTED_VERIFICATION_AUTHORIZATION_TRUST_STATEMENT = "swiyu-protected-verification-authorization-trust-statement+jwt",
+  VERIFICATION_QUERY_PUBLIC_STATEMENT = "swiyu-verification-query-public-statement+jwt",
   NON_COMPLIANCE_TRUST_LIST_STATEMENT = "swiyu-non-compliance-trust-list-statement+jwt",
 }
 
@@ -23,6 +23,7 @@ export interface StatefulStatement extends Statement {
 }
 
 export interface TrustStatement extends Statement {
+  iss: string;
   sub: string;
 }
 

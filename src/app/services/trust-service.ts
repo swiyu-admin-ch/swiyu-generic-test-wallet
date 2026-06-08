@@ -15,6 +15,11 @@ export interface VerificationTrustStatementsResult {
   ncTLS: PagedModelString | string | null;
 }
 
+export interface IssuanceTrustStatementsResult {
+  ncTLS: PagedModelString | string | null;
+  piTLS: PagedModelString | string | null;
+}
+
 @Injectable({
   providedIn: "root",
 })
@@ -61,6 +66,12 @@ export class TrustService {
     );
   }
 
+  fetchPiTLS(): Observable<PagedModelString | string> {
+    return this.trustStatementService.getActivePiTLS("body", false, {
+      httpHeaderAccept: "text/plain" as "*/*",
+    });
+  }
+
   getVerificationTrustStatements(
     sub: string,
   ): Observable<VerificationTrustStatementsResult> {
@@ -68,6 +79,13 @@ export class TrustService {
       pvaTLS: this.fetchPVATLS(sub),
       vqPS: this.fetchVQPS(sub),
       ncTLS: this.fetchNcTLS(),
+    });
+  }
+
+  getIssuanceTrustStatements(): Observable<IssuanceTrustStatementsResult> {
+    return forkJoin({
+      ncTLS: this.fetchNcTLS(),
+      piTLS: this.fetchPiTLS(),
     });
   }
 }
