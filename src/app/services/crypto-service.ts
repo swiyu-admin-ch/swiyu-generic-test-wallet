@@ -6,6 +6,7 @@ import {
   exportJWK,
   generateKeyPair,
   importJWK,
+  jwtVerify,
 } from "jose";
 
 @Injectable({
@@ -97,5 +98,19 @@ export class CryptoService {
     } catch (error) {
       throw new Error(`Failed to decrypt payload: ${error}`);
     }
+  }
+
+  async checkJwtIsValid(token: string, publicKey: CryptoKey): Promise<boolean> {
+    try {
+      await jwtVerify(token, publicKey);
+      return true;
+    } catch (error) {
+      console.warn("JWT verification failed:", error);
+      return false;
+    }
+  }
+
+  async getCryptoKeyFromJwk(jwk: any): Promise<CryptoKey | Uint8Array> {
+    return await importJWK(jwk, "ES256");
   }
 }

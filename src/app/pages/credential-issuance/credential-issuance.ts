@@ -53,6 +53,7 @@ import {
 } from "@app/services/trust-statement-verifier.model";
 import { TrustStatementVerifierService } from "@app/services/trust-statement-verifier.service";
 import { StatusService } from "@app/services/status-service";
+import { DidResponse } from "@app/models/did-response";
 
 @Component({
   selector: "app-credential-issuance",
@@ -187,11 +188,6 @@ export class CredentialIssuance {
     }
     const iss = kid.split("#")[0]; // Extract the part before the '#' character
 
-    console.log("Comparing KID and SUB from issuer metadata JWT:", {
-      iss,
-      sub,
-    });
-
     return iss === sub;
   });
 
@@ -228,6 +224,8 @@ export class CredentialIssuance {
   dpopKeys: WritableSignal<DpopKeyPair | undefined> = signal(undefined);
 
   registryEntry: WritableSignal<RegistryEntry | RegistryEntry[] | undefined> =
+    signal(undefined);
+  registryPublicKeys: WritableSignal<CryptoKey[] | undefined> =
     signal(undefined);
   registryEntryError = signal<Record<string, any> | string | undefined>(
     undefined,
@@ -534,6 +532,23 @@ export class CredentialIssuance {
           this.registryEntryError.set(this.errorFormatter.format(error));
           return EMPTY;
         }),
+        switchMap((entry) => {
+          if (entry instanceof Array) {
+            return from(EMPTY);
+          } else {
+            return from(
+              (entry as DidResponse).state.verificationMethod.map(
+                (vm) =>
+                  this.cryptoService.getCryptoKeyFromJwk(
+                    vm.publicKeyJwk,
+                  ) as Promise<CryptoKey>,
+              ),
+            );
+          }
+        }),
+        tap((cryptoKeys: CryptoKey[] | undefined) => {
+          this.registryPublicKeys.set(cryptoKeys);
+        }),
         switchMap(() => {
           return this.trustService.getIssuanceTrustStatements();
         }),
@@ -582,7 +597,8 @@ export class CredentialIssuance {
             decoded.payload.status.status_list.uri as string,
           ),
         ),
-        tap((statuslistEntry) => {
+        switchMap((statuslistEntry) => {
+          console.log("decoded payload", this.decodedPayload());
           const trustRoot =
             "did:webvh:QmQNMXCBYHLsH5zJeE1hC6tn7GpQFfvqJaWPqwpn7pafcy:identifier-reg-a.trust-infra.swiyu-int.admin.ch:api:v1:did:3d20b010-8d39-4cdd-b5cd-a6356b4e1218";
           this.trustStatementVerifierService.initialize(
@@ -597,16 +613,16 @@ export class CredentialIssuance {
               ),
             },
           );
-          const verifiedIssuerStatements =
-            this.trustStatementVerifierService.verifyIssuanceStatements(
-              trustRoot,
-              this.issuerMetadata()?.iss?.split("#")[0] as string,
-              this.decodedPayload()!["vct"] as string,
-              { test: this.registryEntry()?.toString() },
-              statuslistEntry,
-            );
-
-          this.trustMarkers.set(verifiedIssuerStatements.markers);
+          return this.trustStatementVerifierService.verifyIssuanceStatements(
+            trustRoot,
+            this.issuerMetadata()?.iss?.split("#")[0] as string,
+            this.decodedPayload()!["vct"] as string,
+            this.registryPublicKeys() ?? [],
+            statuslistEntry,
+          );
+        }),
+        tap((verificationResult) => {
+          this.trustMarkers.set(verificationResult.markers);
           this.trustMarkers()?.isTrustedIssuer();
         }),
       )

@@ -1,4 +1,4 @@
-import { Injectable } from "@angular/core";
+import { Injectable, inject } from "@angular/core";
 import {
   NonComplianceTrustListStatement,
   ProtectedIssuanceAuthorizationTrustStatement,
@@ -15,6 +15,7 @@ import {
   VerificationQueryPublicStatement,
 } from "./trust-statement-verifier.model";
 import { v4 as uuidv4 } from "uuid";
+import { CryptoService } from "./crypto-service";
 
 /**
  * TrustStatementVerifierService
@@ -39,6 +40,7 @@ export class TrustStatementVerifierService {
   private serializedTrustStatementJwts: string[];
   private statements: Statement[] = [];
   private urlRestriction: UrlRestriction;
+  private cryptoService = inject(CryptoService);
 
   constructor() {
     this.serializedTrustStatementJwts = [];
@@ -55,7 +57,6 @@ export class TrustStatementVerifierService {
     serializedTrustStatementJwts: string[],
     urlRestriction: UrlRestriction,
   ): void {
-    console.log("serializedTrustStatementJwts", serializedTrustStatementJwts);
     this.serializedTrustStatementJwts = serializedTrustStatementJwts;
     this.urlRestriction = urlRestriction;
     this.statements = this.parseStatements(serializedTrustStatementJwts);
@@ -106,18 +107,18 @@ export class TrustStatementVerifierService {
    * @param verifiedStatusListTokens The list of pre-verified Status List tokens
    * @return A TrustVerificationResult containing the derived Trust Markers
    */
-  public verifyIssuanceStatements(
+  public async verifyIssuanceStatements(
     trustRootDid: string,
     actorDid: string,
     vct: string,
-    publicKeySet: { [key: string]: unknown },
+    publicKeys: CryptoKey[],
     verifiedStatusListTokens: TokenStatusListTokenDto[],
-  ): TrustVerificationResult {
-    const validStatements = this.getValidStatements(
+  ): Promise<TrustVerificationResult> {
+    const validStatements = await this.getValidStatements(
       trustRootDid,
       null,
       actorDid,
-      publicKeySet,
+      publicKeys,
       verifiedStatusListTokens,
     );
     const markers = this.processCommonTrust(validStatements, actorDid);
@@ -141,18 +142,18 @@ export class TrustStatementVerifierService {
    * @param verifiedStatusListTokens The list of pre-verified Status List tokens
    * @return A TrustVerificationResult containing the derived Trust Markers
    */
-  public verifyVerifierStatements(
+  public async verifyVerifierStatements(
     trustRootDid: string,
     publicStatementIssuerDid: string,
     actorDid: string,
-    publicKeySet: { [key: string]: unknown },
+    publicKeys: CryptoKey[],
     verifiedStatusListTokens: TokenStatusListTokenDto[],
-  ): TrustVerificationResult {
-    const validStatements = this.getValidStatements(
+  ): Promise<TrustVerificationResult> {
+    const validStatements = await this.getValidStatements(
       trustRootDid,
       publicStatementIssuerDid,
       actorDid,
-      publicKeySet,
+      publicKeys,
       verifiedStatusListTokens,
     );
 
@@ -169,21 +170,31 @@ export class TrustStatementVerifierService {
   /**
    * Get valid statements that pass all validation filters
    */
-  private getValidStatements(
+  private async getValidStatements(
     trustRootDid: string,
     publicStatementIssuerDid: string | null,
     actorDid: string,
-    publicKeySet: { [key: string]: unknown },
+    publicKeys: CryptoKey[],
     verifiedStatusListTokens: TokenStatusListTokenDto[],
-  ): Statement[] {
-    console.log("Evaluating statements for actor", actorDid, this.statements);
-    return this.statements.filter(
-      (s) =>
-        this.hasTrustedIssuer(s, trustRootDid, publicStatementIssuerDid) &&
-        this.isMatchingActor(s, actorDid) &&
-        this.isValidStatement(s, publicKeySet) &&
-        this.hasValidState(s, verifiedStatusListTokens),
+  ): Promise<Statement[]> {
+    const results = await Promise.all(
+      this.statements.map(async (statement) => ({
+        statement,
+        isValid:
+          this.hasTrustedIssuer(
+            statement,
+            trustRootDid,
+            publicStatementIssuerDid,
+          ) &&
+          this.isMatchingActor(statement, actorDid) &&
+          /*(await this.isValidStatement(statement, publicKeySet)) &&*/
+          this.hasValidState(statement, verifiedStatusListTokens),
+      })),
     );
+
+    return results
+      .filter((result) => result.isValid)
+      .map((result) => result.statement);
   }
 
   /**
@@ -217,19 +228,16 @@ export class TrustStatementVerifierService {
    * Check if statement is a valid JWT (signature verification would happen here)
    * For now, this is a placeholder that returns true
    */
-  private isValidStatement(
+  private async isValidStatement(
     statement: Statement,
     publicKeySet: { [key: string]: unknown },
-  ): boolean {
-    try {
-      // In a real implementation, this would verify the JWT signature using the public key set
-      // For now, we assume the statement is valid as the actual JWT validation
-      // would be done by jwt-validator library
-      return true;
-    } catch (error) {
-      console.warn("Trust Statement is not valid:", error);
-      return false;
-    }
+  ): Promise<boolean> {
+    console.log("publicKeySet", publicKeySet);
+    const key = await this.cryptoService.getCryptoKeyFromJwk(publicKeySet);
+    return this.cryptoService.checkJwtIsValid(
+      statement.serializedJwt,
+      key as CryptoKey,
+    );
   }
 
   /**
@@ -429,8 +437,6 @@ export class TrustStatementVerifierService {
 
       const header = JSON.parse(this.decodeBase64(parts[0]));
       const payload = JSON.parse(this.decodeBase64(parts[1]));
-
-      console.log("Decoded JWT", { header, payload });
 
       const statement: Statement = {
         typ: payload.typ || header.typ || "",
