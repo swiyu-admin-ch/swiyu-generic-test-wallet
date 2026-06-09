@@ -1,4 +1,10 @@
-import { Component, inject, signal, WritableSignal } from "@angular/core";
+import {
+  Component,
+  inject,
+  OnInit,
+  signal,
+  WritableSignal,
+} from "@angular/core";
 import { JWK, SignJWT } from "jose";
 import { FormsModule } from "@angular/forms";
 import { EMPTY, from, of, switchMap, tap, catchError } from "rxjs";
@@ -64,7 +70,7 @@ type PayloadEncryptionStatus = {
   templateUrl: "./credential-verification.html",
   standalone: true,
 })
-export class CredentialVerification {
+export class CredentialVerification implements OnInit {
   private oidvciService = inject(OIDVCIService);
   private oidvpService = inject(OIDVPService);
   private verificationService = inject(VerificationService);
@@ -81,29 +87,43 @@ export class CredentialVerification {
   private walletService = inject(WalletService);
 
   readonly panelOpenState = signal(false);
-  public input =
-    "swiyu-verify://?client_id=did%3Atdw%3AQmcsWxATnPMAcbjukjXAkVAUAKRSC71mjMWjod4NVWrZ9Y%3Amockserver%253A1080%3Aapi%3Av2%3Adid%3A64f74058-4fa3-4609-a7b4-dd6a8853bc32&request_uri=http%3A%2F%2Fdefault-verifier-url.admin.ch%2Foid4vp%2Fapi%2Frequest-object%2F9eafca2d-9bae-46a2-a81d-f3576809d2c0";
+
+  credential: WritableSignal<
+    | {
+        sdjwt?: string;
+        error?: Record<string, any> | string;
+        decodedHeader?: JwtPayload;
+        decodedPayload?: JwtPayload;
+      }
+    | undefined
+  > = signal(undefined);
 
   credentialInput: WritableSignal<string> = signal("");
-  credential: WritableSignal<string | undefined> = signal(undefined);
-  credentialError = signal<Record<string, any> | string | undefined>(undefined);
+  deeplink: WritableSignal<
+    | {
+        decoded?: any;
+        requestUri?: string;
+        error?: Record<string, any> | string;
+      }
+    | undefined
+  > = signal(undefined);
 
-  decodedHeader: WritableSignal<JwtPayload | undefined> = signal(undefined);
-  decodedPayload: WritableSignal<JwtPayload | undefined> = signal(undefined);
+  requestObject: WritableSignal<
+    | {
+        parsed?: RequestObject;
+        response?: RequestObject | string;
+        error?: Record<string, any> | string;
+      }
+    | undefined
+  > = signal(undefined);
 
-  deeplink: WritableSignal<Record<string, string> | undefined> =
-    signal(undefined);
-  deeplinkError = signal<Record<string, any> | string | undefined>(undefined);
-
-  requestObjectResponse: WritableSignal<RequestObject | string | undefined> =
-    signal(undefined);
-  requestObject: WritableSignal<RequestObject | undefined> = signal(undefined);
-  requestObjectError = signal<Record<string, any> | string | undefined>(
-    undefined,
-  );
-
-  dcqlQuery: WritableSignal<DcqlQueryDto | undefined> = signal(undefined);
-  dcqlQueryError = signal<Record<string, any> | string | undefined>(undefined);
+  dcql: WritableSignal<
+    | {
+        query?: DcqlQueryDto | undefined;
+        error?: Record<string, any> | string;
+      }
+    | undefined
+  > = signal(undefined);
 
   requiredCredentials: WritableSignal<DcqlCredentialDto[] | undefined> =
     signal(undefined);
@@ -117,15 +137,18 @@ export class CredentialVerification {
     undefined,
   );
 
-  vpToken: WritableSignal<string | undefined> = signal(undefined);
-  vpTokenError = signal<Record<string, any> | string | undefined>(undefined);
+  token: WritableSignal<
+    { token?: string; error?: Record<string, any> | string } | undefined
+  > = signal(undefined);
 
-  verificationResponse: WritableSignal<string | undefined> = signal(undefined);
-  verificationResponseSubmitted: WritableSignal<boolean | undefined> =
-    signal(undefined);
-  verificationResponseError = signal<Record<string, any> | string | undefined>(
-    undefined,
-  );
+  verification: WritableSignal<
+    | {
+        response?: string;
+        submitted?: boolean;
+        error?: Record<string, any> | string;
+      }
+    | undefined
+  > = signal(undefined);
 
   registry: WritableSignal<
     | {
@@ -134,12 +157,6 @@ export class CredentialVerification {
       }
     | undefined
   > = signal(undefined);
-
-  registryEntry: WritableSignal<RegistryEntry | RegistryEntry[] | undefined> =
-    signal(undefined);
-  registryEntryError = signal<Record<string, any> | string | undefined>(
-    undefined,
-  );
 
   trustStatements: WritableSignal<
     | {
@@ -154,14 +171,10 @@ export class CredentialVerification {
     | undefined
   > = signal(undefined);
 
-  constructor() {
-    const navigation = this.router.getCurrentNavigation();
-    const credential = navigation?.extras?.state?.["credential"] as
-      | string
-      | undefined;
-    if (credential) {
-      this.credentialInput.set(credential);
-    }
+  ngOnInit(): void {
+    const requestedVCs = this.walletService.getRequestedVCs()();
+    const initInput = requestedVCs.at(0)?.sdJwt ?? "";
+    this.credentialInput.set(initInput);
   }
 
   public onClear(): void {
@@ -175,67 +188,85 @@ export class CredentialVerification {
       .pipe(
         tap((credential: string) => {
           this.validateCredential(credential);
-          this.credential.set(credential);
+          this.credential.update((current) => ({
+            ...current,
+            sdjwt: credential,
+          }));
         }),
         catchError((error) => {
-          this.credentialError.set(this.errorFormatter.format(error));
+          this.credential.update((current) => ({
+            ...current,
+            error: this.errorFormatter.format(error),
+          }));
           return EMPTY;
         }),
-        switchMap(() => of(input)),
-        tap((deeplinkInput: string) => {
-          const deeplink =
-            this.verificationService.decodeDeeplink(deeplinkInput);
-          this.deeplink.set(deeplink);
-        }),
+        tap(() =>
+          this.deeplink.update((current) => ({
+            ...current,
+            decoded: this.verificationService.decodeDeeplink(input),
+            requestUri:
+              this.verificationService.decodeDeeplink(input)["request_uri"],
+          })),
+        ),
         catchError((error) => {
-          this.deeplinkError.set(this.errorFormatter.format(error));
+          this.deeplink.update((current) => ({
+            ...current,
+            error: this.errorFormatter.format(error),
+          }));
           return EMPTY;
         }),
         switchMap(() => {
-          const requestObjectUrl = this.deeplink()?.["request_uri"];
-          if (!requestObjectUrl) {
+          if (!this.deeplink()?.requestUri) {
             throw new Error("Missing request_uri");
           }
 
-          return this.oidvpService.fetchRequestObject(requestObjectUrl);
+          return this.oidvpService.fetchRequestObject(
+            this.deeplink()?.requestUri!,
+          );
         }),
         tap((requestObjectResponse: RequestObject | string) => {
-          this.requestObjectResponse.set(requestObjectResponse);
-          this.requestObject.set(
-            this.cryptoService.decodeIfJwt<RequestObject>(
+          this.requestObject.update((current) => ({
+            ...current,
+            response: requestObjectResponse,
+            parsed: this.cryptoService.decodeIfJwt<RequestObject>(
               requestObjectResponse,
             ),
-          );
+          }));
           this.trustStatements.update((current) => ({
             ...current,
-            idTS: this.requestObject()?.verifier_info?.at(0)?.data,
+            idTS: this.requestObject()?.parsed?.verifier_info?.at(0)?.data,
             idTSDecoded: this.cryptoService.decodeIfJwt<TrustStatement>(
-              this.requestObject()?.verifier_info?.at(0)?.data as
-                | string
-                | TrustStatement,
+              this.requestObject()?.parsed?.verifier_info?.at(0)
+                ?.data as string,
             ),
           }));
         }),
         catchError((error) => {
-          this.requestObjectError.set(this.errorFormatter.format(error));
+          this.requestObject.update((current) => ({
+            ...current,
+            error: this.errorFormatter.format(error),
+          }));
           return EMPTY;
         }),
-        switchMap(() => of(this.requestObject()?.dcql_query)),
+        switchMap(() => of(this.requestObject()?.parsed?.dcql_query)),
         tap((dcqlQuery: DcqlQueryDto | undefined) => {
           if (!dcqlQuery) {
             throw new Error("Missing DCQL query");
           }
 
-          this.dcqlQuery.set(dcqlQuery);
+          this.dcql.update((current) => ({ ...current, query: dcqlQuery }));
         }),
         catchError((error) => {
-          this.dcqlQueryError.set(this.errorFormatter.format(error));
+          this.dcql.update((current) => ({
+            ...current,
+            error: this.errorFormatter.format(error),
+          }));
           return EMPTY;
         }),
         switchMap(() =>
           of(
             this.verificationService.extractCredentialsFromDCQL(
-              this.dcqlQuery()!,
+              this.dcql()?.query!,
             ),
           ),
         ),
@@ -250,11 +281,11 @@ export class CredentialVerification {
           this.requiredCredentialsError.set(this.errorFormatter.format(error));
           return EMPTY;
         }),
-        switchMap(() =>
-          of(this.extractPayloadEncryptionStatus(this.requestObject()!)),
-        ),
-        tap((payloadEncryption: PayloadEncryptionStatus) => {
-          this.payloadEncryption.set(payloadEncryption);
+        switchMap(() => {
+          this.payloadEncryption.set(
+            this.extractPayloadEncryptionStatus(this.requestObject()?.parsed!),
+          );
+          return of(null);
         }),
         catchError((error) => {
           this.payloadEncryptionError.set(this.errorFormatter.format(error));
@@ -262,7 +293,7 @@ export class CredentialVerification {
         }),
         switchMap(() =>
           this.trustService.getVerificationTrustStatements(
-            this.requestObject()?.client_id as string,
+            this.requestObject()?.parsed?.client_id as string,
           ),
         ),
         tap((response) => {
@@ -280,7 +311,7 @@ export class CredentialVerification {
           }));
         }),
         switchMap(() => {
-          const did = this.requestObject()?.iss!;
+          const did = this.requestObject()?.parsed?.iss!;
           const parts = did.split(":");
           const registryEntry = `https://${decodeURIComponent(did.substring(did.indexOf(parts[3]), did.length).replace(/:/g, "/"))}/did.jsonl`;
           return this.oidvciService.fetchRegistryEntry(registryEntry);
@@ -290,7 +321,6 @@ export class CredentialVerification {
             ...current,
             registryEntry: entry,
           }));
-          this.registryEntry.set(entry);
         }),
         catchError((error) => {
           this.registry.update((current) => ({
@@ -301,11 +331,8 @@ export class CredentialVerification {
         }),
         switchMap((entry: RegistryEntry[] | DidResponse) => {
           if (entry instanceof Array) {
-            this.registryEntry.set(entry);
             return EMPTY;
           }
-
-          this.registryEntry.set(undefined);
 
           return from(
             Promise.all(
@@ -319,8 +346,6 @@ export class CredentialVerification {
           );
         }),
         switchMap((cryptoKeys: CryptoKey[]) => {
-          console.log("trust statements", this.trustStatements());
-
           const trustRoot =
             "did:webvh:QmQNMXCBYHLsH5zJeE1hC6tn7GpQFfvqJaWPqwpn7pafcy:identifier-reg-a.trust-infra.swiyu-int.admin.ch:api:v1:did:3d20b010-8d39-4cdd-b5cd-a6356b4e1218";
 
@@ -344,7 +369,7 @@ export class CredentialVerification {
             this.trustStatementVerifierService.verifyVerifierStatements(
               trustRoot,
               this.trustStatements()?.pvaTSDecoded?.iss!,
-              this.requestObject()?.iss?.toString() ?? "",
+              this.requestObject()?.parsed?.iss?.toString() ?? "",
               cryptoKeys,
               [
                 {
@@ -359,12 +384,6 @@ export class CredentialVerification {
           );
         }),
         tap((verificationResult: TrustVerificationResult) => {
-          console.log(
-            "markers",
-            verificationResult,
-            verificationResult.markers,
-          );
-
           this.trustStatements.update((current) => ({
             ...current,
             markers: verificationResult.markers,
@@ -374,38 +393,42 @@ export class CredentialVerification {
         switchMap(() =>
           from(
             this.createAndSignPresentation(
-              this.credential()!,
-              this.requestObject()?.client_id as string,
-              this.requestObject()?.nonce as string,
+              this.credential()?.sdjwt!,
+              this.requestObject()?.parsed?.client_id as string,
+              this.requestObject()?.parsed?.nonce as string,
             ),
           ),
         ),
-        tap((vpToken: string) => {
-          this.vpToken.set(vpToken);
+        tap((token: string) => {
+          this.token.set({ token });
         }),
         catchError((error) => {
-          this.vpTokenError.set(this.errorFormatter.format(error));
+          this.token.set({ error: this.errorFormatter.format(error) });
           return EMPTY;
         }),
         switchMap(() => {
-          const dcqlCredentials = this.dcqlQuery()?.credentials ?? [];
+          const dcqlCredentials = this.dcql()?.query?.credentials ?? [];
           const credentialId = dcqlCredentials[0]?.id || "credential_1";
 
           return this.oidvpService.submitVerificationResponse(
-            this.requestObject()!,
-            this.vpToken()!,
+            this.requestObject()?.parsed!,
+            this.token()?.token!,
             credentialId,
           );
         }),
         tap((response: string) => {
-          this.verificationResponse.set(response);
-          this.verificationResponseSubmitted.set(true);
+          this.verification.update((current) => ({
+            ...current,
+            response,
+            submitted: true,
+          }));
         }),
         catchError((error) => {
-          this.verificationResponseSubmitted.set(false);
-          this.verificationResponseError.set(
-            this.errorFormatter.formatRequestError(error, "POST"),
-          );
+          this.verification.update((current) => ({
+            ...current,
+            error: this.errorFormatter.formatRequestError(error, "POST"),
+            submitted: true,
+          }));
           return EMPTY;
         }),
       )
@@ -414,25 +437,14 @@ export class CredentialVerification {
 
   public reset(): void {
     this.credential.set(undefined);
-    this.credentialError.set(undefined);
-    this.decodedHeader.set(undefined);
-    this.decodedPayload.set(undefined);
     this.deeplink.set(undefined);
-    this.deeplinkError.set(undefined);
-    this.requestObjectResponse.set(undefined);
     this.requestObject.set(undefined);
-    this.requestObjectError.set(undefined);
-    this.dcqlQuery.set(undefined);
-    this.dcqlQueryError.set(undefined);
     this.requiredCredentials.set(undefined);
     this.requiredCredentialsError.set(undefined);
     this.payloadEncryption.set(undefined);
     this.payloadEncryptionError.set(undefined);
-    this.vpToken.set(undefined);
-    this.vpTokenError.set(undefined);
-    this.verificationResponse.set(undefined);
-    this.verificationResponseSubmitted.set(undefined);
-    this.verificationResponseError.set(undefined);
+    this.token.set(undefined);
+    this.verification.set(undefined);
   }
 
   public extractClaimsFromDcqlQuery(
@@ -488,8 +500,11 @@ export class CredentialVerification {
       new TextDecoder().decode(this.base64UrlDecode(jwtComponents[1])),
     );
 
-    this.decodedHeader.set(headerJson);
-    this.decodedPayload.set(payloadJson);
+    this.credential.update((current) => ({
+      ...current,
+      decodedHeader: headerJson,
+      decodedPayload: payloadJson,
+    }));
   }
 
   private extractPayloadEncryptionStatus(
@@ -545,7 +560,7 @@ export class CredentialVerification {
       throw new Error("Missing nonce");
     }
 
-    const requiredFields = this.extractClaimsFromDcqlQuery(this.dcqlQuery());
+    const requiredFields = this.extractClaimsFromDcqlQuery(this.dcql()?.query);
     const payloadJson = this.extractPayloadFromSdJwt(credentialString);
     const validationErrors = this.validateRequiredFields(
       requiredFields,
@@ -638,6 +653,12 @@ export class CredentialVerification {
       }
 
       // TODO fix for recursive
+      requiredClaimNames.forEach((requiredClaimName) => {
+        if (claimName === requiredClaimName) {
+          selectedDisclosures.push(disclosure);
+        }
+      });
+
       selectedDisclosures.push(disclosure);
     });
 
