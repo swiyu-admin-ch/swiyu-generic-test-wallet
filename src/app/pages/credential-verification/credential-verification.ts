@@ -117,6 +117,7 @@ export class CredentialVerification implements OnInit {
 
   dcql: WritableSignal<
     | {
+        response?: DcqlQueryDto | string;
         query?: DcqlQueryDto | undefined;
         error?: Record<string, any> | string;
       }
@@ -164,6 +165,8 @@ export class CredentialVerification implements OnInit {
         pvaTSDecoded?: TrustStatement | undefined;
         ncTLS?: string;
         ncTLSDecoded?: TrustStatement;
+        vqPS?: string;
+        vqPSDecoded?: TrustStatement;
         markers?: TrustMarkers;
       }
     | undefined
@@ -246,12 +249,10 @@ export class CredentialVerification implements OnInit {
           }));
           return EMPTY;
         }),
-        switchMap(() => of(this.requestObject()?.parsed?.dcql_query)),
-        tap((dcqlQuery: DcqlQueryDto | undefined) => {
-          if (!dcqlQuery) {
-            throw new Error("Missing DCQL query");
-          }
+        tap(() => {
+          const dcqlQuery = this.getDCQLQueryFromRequestObject();
 
+          console.log("dcqlQuery", dcqlQuery);
           this.dcql.update((current) => ({ ...current, query: dcqlQuery }));
         }),
         catchError((error) => {
@@ -309,7 +310,7 @@ export class CredentialVerification implements OnInit {
           }));
         }),
         switchMap(() => {
-          const did = this.requestObject()?.parsed?.iss!;
+          const did = this.requestObject()?.parsed?.iss! as string;
           const parts = did.split(":");
           const registryEntry = `https://${decodeURIComponent(did.substring(did.indexOf(parts[3]), did.length).replace(/:/g, "/"))}/did.jsonl`;
           return this.oidvciService.fetchRegistryEntry(registryEntry);
@@ -347,6 +348,7 @@ export class CredentialVerification implements OnInit {
           const trustRoot =
             "did:webvh:QmQNMXCBYHLsH5zJeE1hC6tn7GpQFfvqJaWPqwpn7pafcy:identifier-reg-a.trust-infra.swiyu-int.admin.ch:api:v1:did:3d20b010-8d39-4cdd-b5cd-a6356b4e1218";
 
+          console.log("Truststatements", this.trustStatements());
           const statements = [
             this.trustStatements()?.idTS!,
             this.trustStatements()?.ncTLS?.length
@@ -711,6 +713,32 @@ export class CredentialVerification implements OnInit {
       );
 
     return new Set(claimNames);
+  }
+
+  private getDCQLQueryFromRequestObject(): DcqlQueryDto {
+    this.dcql.update((current) => ({
+      ...current,
+      response: this.requestObject()?.parsed?.dcql_query!,
+    }));
+    if (
+      this.requestObject()?.parsed?.scope === undefined &&
+      this.requestObject()?.parsed?.dcql_query !== undefined
+    ) {
+      return this.requestObject()?.parsed?.dcql_query!;
+    } else if (
+      this.requestObject()?.parsed?.scope !== undefined &&
+      this.requestObject()?.parsed?.verifier_info?.length! > 1
+    ) {
+      const decoded = this.cryptoService.decodeIfJwt<{
+        request: { query: DcqlQueryDto };
+      }>(this.requestObject()?.parsed?.verifier_info?.at(1)?.data as string);
+
+      console.log("test", decoded.request.query);
+
+      return decoded.request.query;
+    } else {
+      throw new Error("Missing DCQL query");
+    }
   }
 
   private decodeDisclosure(disclosure: string): unknown[] | undefined {

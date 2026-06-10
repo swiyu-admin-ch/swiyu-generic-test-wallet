@@ -1,7 +1,7 @@
 import { inject, Injectable } from "@angular/core";
-import { forkJoin, from, Observable, switchMap } from "rxjs";
-import { Statements20Service } from "src/generated/trust/api/api";
-import { PagedModelString } from "src/generated/trust/model/models";
+import { forkJoin, from, Observable } from "rxjs";
+import { PagedModelString } from "../../generated/trust-data/model/pagedModelString";
+import { Statements20Service } from "../../generated/trust-data/api/statements20.service";
 
 export interface ValidationResult {
   idTS: string | null;
