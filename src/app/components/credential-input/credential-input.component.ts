@@ -36,7 +36,10 @@ type Disclosure = [string, unknown] | [string, string, unknown];
 })
 export class Credential implements OnChanges {
   @Input({ required: true }) encodedCredential: string | undefined;
-  @Input({ required: true }) registryEntry: RegistryEntry[] | undefined;
+  @Input({ required: true }) registryEntry:
+    | RegistryEntry[]
+    | RegistryEntry
+    | undefined;
   @Output() credentialChange = new EventEmitter<string>();
 
   private router = inject(Router);
@@ -62,8 +65,15 @@ export class Credential implements OnChanges {
         token[0],
       )) as JwtPayload;
 
-      if (this.registryEntry && this.registryEntry.length > 0) {
-        const registryValue = this.registryEntry[3] as Record<string, unknown>;
+      if (
+        this.registryEntry &&
+        (Array.isArray(this.registryEntry)
+          ? this.registryEntry.length > 0
+          : true)
+      ) {
+        const registryValue = Array.isArray(this.registryEntry)
+          ? this.registryEntry[3]
+          : this.registryEntry;
         const verificationMethods = (
           registryValue?.["value"] as Record<string, unknown>
         )?.["verificationMethod"] as Record<string, unknown>[];

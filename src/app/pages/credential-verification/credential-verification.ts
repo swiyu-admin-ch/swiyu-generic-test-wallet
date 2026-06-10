@@ -22,7 +22,6 @@ import { SdJwtStoreService } from "@services/sd-jwt-store.service";
 import { VcKeyStoreService } from "@services/vc-key-store.service";
 import { VcStoreService } from "@services/vc-store.service";
 import { TrustStatementVerifierService } from "@app/services/trust-statement-verifier.service";
-import { Router } from "@angular/router";
 import {
   DcqlClaimDto,
   DcqlCredentialDto,
@@ -78,7 +77,6 @@ export class CredentialVerification implements OnInit {
   private sdJwtStore = inject(SdJwtStoreService);
   private vcKeyStore = inject(VcKeyStoreService);
   private vcStore = inject(VcStoreService);
-  private router = inject(Router);
   private cryptoService = inject(CryptoService);
   private errorFormatter = inject(ErrorFormatterService);
   private trustService = inject(TrustService);
@@ -445,6 +443,8 @@ export class CredentialVerification implements OnInit {
     this.payloadEncryptionError.set(undefined);
     this.token.set(undefined);
     this.verification.set(undefined);
+    this.dcql.set(undefined);
+    this.trustStatements.set(undefined);
   }
 
   public extractClaimsFromDcqlQuery(

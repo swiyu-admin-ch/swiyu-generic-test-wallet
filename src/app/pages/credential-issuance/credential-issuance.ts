@@ -71,7 +71,6 @@ import { DidResponse } from "@app/models/did-response";
     MatInputModule,
     MatFormFieldModule,
     DeeplinkInput,
-    HolderKeysCardComponent,
     DataViewerComponent,
     KeyValuePipe,
   ],
