@@ -30,7 +30,7 @@ You can use this online version to test your own swiyu Generic Issuer and Verifi
 
 **Important:** To use the demo against locally deployed backend services, you may need to disable browser CORS security.
 
-*⚠️ Security Warning: Disabling CORS should only be done on a separate browser profile used exclusively for development and testing. Never disable CORS on your main browser profile.*
+_⚠️ Security Warning: Disabling CORS should only be done on a separate browser profile used exclusively for development and testing. Never disable CORS on your main browser profile._
 
 ## Prerequisites
 
@@ -38,10 +38,10 @@ Before starting the development server or building the application, ensure you h
 
 ### Required Software
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| **Node.js** | 20.x or 22.x | JavaScript runtime |
-| **npm** | 9.x or higher | Package manager |
+| Tool        | Version       | Purpose            |
+| ----------- | ------------- | ------------------ |
+| **Node.js** | 22.x or 24.x  | JavaScript runtime |
+| **npm**     | 9.x or higher | Package manager    |
 
 ## Getting Started
 
@@ -50,7 +50,7 @@ Before starting the development server or building the application, ensure you h
 1. **Set the correct Node.js version**:
 
 ```bash
-nvm use 22
+nvm use 24
 ```
 
 2. **Install dependencies**:
@@ -98,34 +98,35 @@ npm run lint
 Supported:
 
 - Issuance V1
-    Single `vc+sd-jwt` credential
+  Single `vc+sd-jwt` credential
 - Issuance V2
-    Batch credential endpoint with support for multiple credentials
+  Batch credential endpoint with support for multiple credentials
 - Holder binding
-    Via `proof_type: jwt` (ES256)
-- Credential request encryption 
-    (wallet --> issuer)
-- Credential response encryption 
-    (issuer --> wallet)
+  Via `proof_type: jwt` (ES256)
+- Credential request encryption
+  (wallet --> issuer)
+- Credential response encryption
+  (issuer --> wallet)
 
 Not yet supported (will be available in the future):
 
 - Credential renewal flow
 - DPoP (Demonstrating Proof of Possession)
+
 ### Credential Verification (OIDC4VP)
 
 Supported:
 
 - Verification V1
-    DIF Presentation Exchange, builds a selective-disclosure VP token with a `kb+jwt`.
+  DIF Presentation Exchange, builds a selective-disclosure VP token with a `kb+jwt`.
 - Verification V2
-    DCQL (Digital Credentials Query Language) same flow using a DCQL query.
+  DCQL (Digital Credentials Query Language) same flow using a DCQL query.
 - Selective disclosure
-    Only the claims required by the verifier query are included in the VP token.
+  Only the claims required by the verifier query are included in the VP token.
 - Key binding JWT (`kb+jwt`)
-    Appended to every VP token, bound to the holder key and the verifier nonce.
+  Appended to every VP token, bound to the holder key and the verifier nonce.
 - Response payload encryption (`direct_post.jwt`)
-    VP token is JWE-encrypted before submission.
+  VP token is JWE-encrypted before submission.
 
 Not yet supported (will be available in the future):
 
@@ -144,6 +145,7 @@ To complete a full issuance and verification flow, maintain a single browser ses
 For detailed step-by-step instructions on testing credential issuance and verification flows, please refer to the [Usage Guide](./GUIDE.md).
 
 The guide covers:
+
 - Browser CORS Configuration
 - Understanding Deeplinks
 - Part 1: Issuance
@@ -158,4 +160,3 @@ Please follow the guidelines for contributing found in [CONTRIBUTING.md](/CONTRI
 ## License
 
 This project is licensed under the terms of the MIT license. See the [LICENSE](/LICENSE) file for details.
-
