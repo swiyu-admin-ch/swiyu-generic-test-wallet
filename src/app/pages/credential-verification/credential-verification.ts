@@ -652,13 +652,6 @@ export class CredentialVerification implements OnInit {
         return;
       }
 
-      // TODO fix for recursive
-      requiredClaimNames.forEach((requiredClaimName) => {
-        if (claimName === requiredClaimName) {
-          selectedDisclosures.push(disclosure);
-        }
-      });
-
       selectedDisclosures.push(disclosure);
     });
 
