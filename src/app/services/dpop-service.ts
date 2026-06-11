@@ -1,6 +1,6 @@
 import { Injectable } from "@angular/core";
 import { HttpClient, HttpHeaders, HttpParams } from "@angular/common/http";
-import { generateKeyPair, exportJWK, SignJWT, JWK } from "jose";
+import { SignJWT } from "jose";
 
 import { firstValueFrom } from "rxjs";
 import { OAuthToken } from "src/generated/issuer/model/models";

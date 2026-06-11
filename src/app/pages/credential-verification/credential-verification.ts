@@ -22,6 +22,7 @@ import { SdJwtStoreService } from "@services/sd-jwt-store.service";
 import { VcKeyStoreService } from "@services/vc-key-store.service";
 import { VcStoreService } from "@services/vc-store.service";
 import { TrustStatementVerifierService } from "@app/services/trust-statement-verifier.service";
+import { environment } from "src/environments/environment";
 import {
   DcqlClaimDto,
   DcqlCredentialDto,
@@ -37,7 +38,7 @@ import {
   TrustMarkers,
   TrustStatement,
   TrustVerificationResult,
-} from "@app/services/trust-statement-verifier.model";
+} from "@app/models/trust-statement-verifier.model";
 import { TrustService } from "@app/services/trust-service";
 import { WalletService } from "@app/services/wallet-service";
 import { OIDVCIService } from "@app/services/oidvci-service";
@@ -345,10 +346,6 @@ export class CredentialVerification implements OnInit {
           );
         }),
         switchMap((cryptoKeys: CryptoKey[]) => {
-          const trustRoot =
-            "did:webvh:QmQNMXCBYHLsH5zJeE1hC6tn7GpQFfvqJaWPqwpn7pafcy:identifier-reg-a.trust-infra.swiyu-int.admin.ch:api:v1:did:3d20b010-8d39-4cdd-b5cd-a6356b4e1218";
-
-          console.log("Truststatements", this.trustStatements());
           const statements = [
             this.trustStatements()?.idTS!,
             this.trustStatements()?.ncTLS?.length
@@ -360,17 +357,16 @@ export class CredentialVerification implements OnInit {
           ];
 
           this.trustStatementVerifierService.initialize(statements, {
-            allowedHosts: new Set([
-              "trust-data-service-int-a.apps.p-szb-ros-shrd-npr-01.cloud.admin.ch",
-            ]),
+            allowedHosts: environment.allowedHosts,
           });
 
           return from(
             this.trustStatementVerifierService.verifyVerifierStatements(
-              trustRoot,
+              environment.trustRoot,
               this.trustStatements()?.pvaTSDecoded?.iss!,
               this.requestObject()?.parsed?.iss?.toString() ?? "",
               cryptoKeys,
+              // this is a mock at the moment as it isn't checked at the moment
               [
                 {
                   sub: "test",

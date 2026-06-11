@@ -13,7 +13,7 @@ import {
   TrustVerificationResult,
   UrlRestriction,
   VerificationQueryPublicStatement,
-} from "./trust-statement-verifier.model";
+} from "../models/trust-statement-verifier.model";
 import { v4 as uuidv4 } from "uuid";
 import { CryptoService } from "./crypto-service";
 

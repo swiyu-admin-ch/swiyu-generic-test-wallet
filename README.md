@@ -107,11 +107,11 @@ Supported:
   (wallet --> issuer)
 - Credential response encryption
   (issuer --> wallet)
+- DPoP (Demonstrating Proof of Possession)
 
 Not yet supported (will be available in the future):
 
 - Credential renewal flow
-- DPoP (Demonstrating Proof of Possession)
 
 ### Credential Verification (OIDC4VP)
 

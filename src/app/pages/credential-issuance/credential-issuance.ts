@@ -19,6 +19,7 @@ import { DeeplinkService } from "@services/deeplink.service";
 import { DeeplinkInput } from "../../components/deeplink-input/deeplink-input.component";
 import { MatCard, MatCardContent, MatCardTitle } from "@angular/material/card";
 import { SdJwtStoreService } from "@services/sd-jwt-store.service";
+import { environment } from "src/environments/environment";
 import {
   CredentialConfiguration,
   CredentialEndpointResponse,
@@ -34,7 +35,6 @@ import {
   OpenIdConfigResponse,
 } from "@app/models/api-response";
 import { DataViewerComponent } from "@app/components/data-viewer/data-viewer.component";
-import { HolderKeysCardComponent } from "@components/holder/holder.component";
 import { OIDVCIService } from "@app/services/oidvci-service";
 import { CredentialOffer } from "@app/models/credential-offer";
 import { CryptoService } from "@app/services/crypto-service";
@@ -50,7 +50,7 @@ import { TrustService } from "@app/services/trust-service";
 import {
   TrustMarkers,
   TrustStatement,
-} from "@app/services/trust-statement-verifier.model";
+} from "@app/models/trust-statement-verifier.model";
 import { TrustStatementVerifierService } from "@app/services/trust-statement-verifier.service";
 import { StatusService } from "@app/services/status-service";
 import { DidResponse } from "@app/models/did-response";
@@ -607,13 +607,11 @@ export class CredentialIssuance {
               this.trustStatements()?.piTLS!,
             ],
             {
-              allowedHosts: new Set(
-                "trust-data-service-int-a.apps.p-szb-ros-shrd-npr-01.cloud.admin.ch",
-              ),
+              allowedHosts: environment.allowedHosts,
             },
           );
           return this.trustStatementVerifierService.verifyIssuanceStatements(
-            trustRoot,
+            environment.trustRoot,
             this.issuerMetadata()?.iss?.split("#")[0] as string,
             this.decodedPayload()!["vct"] as string,
             this.registryPublicKeys() ?? [],
