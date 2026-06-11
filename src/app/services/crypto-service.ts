@@ -1,11 +1,18 @@
-import { Injectable } from '@angular/core';
-import { compactDecrypt, CompactEncrypt, CompactJWEHeaderParameters, exportJWK, generateKeyPair, importJWK } from 'jose';
+import { Injectable } from "@angular/core";
+import {
+  compactDecrypt,
+  CompactEncrypt,
+  CompactJWEHeaderParameters,
+  exportJWK,
+  generateKeyPair,
+  importJWK,
+  jwtVerify,
+} from "jose";
 
 @Injectable({
-  providedIn: 'root',
+  providedIn: "root",
 })
 export class CryptoService {
-
   async generateEphemeralKeyPair(alg: string) {
     return await generateKeyPair(alg, { crv: "P-256" });
   }
@@ -15,17 +22,17 @@ export class CryptoService {
 
     return {
       ...jwk,
-      use: 'enc',
-      alg: 'ECDH-ES',
-      crv: 'P-256',
+      use: "enc",
+      alg: "ECDH-ES",
+      crv: "P-256",
     };
   }
 
   decodeJwtPayload<T = any>(token: string): T {
-    const parts = token.split('.');
+    const parts = token.split(".");
 
     if (parts.length !== 3) {
-      throw new Error('Invalid JWT format');
+      throw new Error("Invalid JWT format");
     }
 
     try {
@@ -33,12 +40,13 @@ export class CryptoService {
       const decoded = atob(payload);
       return JSON.parse(decoded) as T;
     } catch (error) {
+      console.error("Failed to decode JWT payload:", error);
       throw new Error(`Failed to decode JWT payload: ${error}`);
     }
   }
 
   decodeIfJwt<T>(input: string | T): T {
-    if (typeof input === 'string') {
+    if (typeof input === "string") {
       return this.decodeJwtPayload<T>(input);
     }
 
@@ -46,7 +54,7 @@ export class CryptoService {
   }
 
   isJwt(input: unknown): boolean {
-    return typeof input === 'string' && input.split('.').length === 3;
+    return typeof input === "string" && input.split(".").length === 3;
   }
 
   async encryptPayload(
@@ -54,9 +62,8 @@ export class CryptoService {
     jwk: any,
     alg: string,
     enc: string,
-    zip: string
+    zip: string,
   ): Promise<string> {
-
     const publicKey = await importJWK(jwk, alg);
     const encoded = new TextEncoder().encode(JSON.stringify(payload));
 
@@ -80,14 +87,30 @@ export class CryptoService {
     privateKey: CryptoKey,
   ): Promise<unknown> {
     try {
-      if (typeof input !== 'string') {
+      if (typeof input !== "string") {
         return input;
       }
-      const { plaintext } = await compactDecrypt(input, privateKey);
+      const { plaintext } = await compactDecrypt(input, privateKey, {
+        maxDecompressedLength: 10 * 1024 * 1024,
+      });
       const decoded = new TextDecoder().decode(plaintext);
       return JSON.parse(decoded);
     } catch (error) {
       throw new Error(`Failed to decrypt payload: ${error}`);
     }
+  }
+
+  async checkJwtIsValid(token: string, publicKey: CryptoKey): Promise<boolean> {
+    try {
+      await jwtVerify(token, publicKey);
+      return true;
+    } catch (error) {
+      console.warn("JWT verification failed:", error);
+      return false;
+    }
+  }
+
+  async getCryptoKeyFromJwk(jwk: any): Promise<CryptoKey | Uint8Array> {
+    return await importJWK(jwk, "ES256");
   }
 }

@@ -26,6 +26,21 @@
       <div style="margin-bottom: 12px;">
         <div style="display: flex; align-items: center; justify-content: space-between;">
           <div style="display: flex; align-items: center; gap: 4px;">
+            <span style="font-size: 13px; margin: 0;">Use DPoP</span>
+            <mat-icon matTooltip="Use DPoP for requests"
+              matTooltipPosition="above"
+              style="font-size: 14px; width: 14px; height: 14px; ">info</mat-icon>
+          </div>
+          <mat-slide-toggle [checked]="walletOptions().useDPoP"
+            (change)="onDPoPChange($event.checked)"
+            style="margin: 0;">
+          </mat-slide-toggle>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 12px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 4px;">
             <span style="font-size: 13px; margin: 0;">Payload Encryption Preference</span>
             <mat-icon matTooltip="Prefer payload encryption even if not enforced"
               matTooltipPosition="above"
@@ -33,6 +48,21 @@
           </div>
           <mat-slide-toggle [checked]="walletOptions().payloadEncryptionPreference"
             (change)="onPayloadEncryptionChange($event.checked)"
+            style="margin: 0;">
+          </mat-slide-toggle>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 12px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <span style="font-size: 13px; margin: 0;">Use Protected Issuance</span>
+            <mat-icon matTooltip="Use protected issuance (uses trust statements and signed metadata)"
+              matTooltipPosition="above"
+              style="font-size: 14px; width: 14px; height: 14px; ">info</mat-icon>
+          </div>
+          <mat-slide-toggle [checked]="walletOptions().useProtectedIssuance"
+            (change)="onUseProtectedIssuanceChange($event.checked)"
             style="margin: 0;">
           </mat-slide-toggle>
         </div>

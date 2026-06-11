@@ -1,12 +1,21 @@
-import { inject, Injectable, signal, WritableSignal } from '@angular/core';
-import { HolderKeyService } from './holder-key.service';
-import { CryptoService } from './crypto-service';
-import { JwtPayload, OpenIdMetadataResponse, RegistryEntry } from '@app/models/api-response';
+import { inject, Injectable, signal, WritableSignal } from "@angular/core";
+import { HolderKeyService } from "./holder-key.service";
+import { CryptoService } from "./crypto-service";
+import {
+  JwtPayload,
+  OpenIdMetadataResponse,
+  RegistryEntry,
+} from "@app/models/api-response";
 import * as jose from "jose";
-import { CreateCredentialRequest, CredentialConfiguration, CredentialEndpointResponse, NonceResponse } from 'src/generated/issuer';
-import { WalletOptions } from '@app/models/wallet-options';
-import { VCRecord } from '@app/models/vc-record';
-import { VcKeyStoreService } from './vc-key-store.service';
+import {
+  CreateCredentialRequest,
+  CredentialConfiguration,
+  CredentialEndpointResponse,
+  NonceResponse,
+} from "src/generated/issuer";
+import { WalletOptions } from "@app/models/wallet-options";
+import { VCRecord } from "@app/models/vc-record";
+import { VcKeyStoreService } from "./vc-key-store.service";
 
 interface ProofKeyPair {
   proofIndex: number;
@@ -14,9 +23,8 @@ interface ProofKeyPair {
   jwk: jose.JWK;
 }
 
-
 @Injectable({
-  providedIn: 'root',
+  providedIn: "root",
 })
 export class WalletService {
   private holderKeyService = inject(HolderKeyService);
@@ -24,14 +32,18 @@ export class WalletService {
   private vcKeyStore = inject(VcKeyStoreService);
   private requestedVCs: WritableSignal<VCRecord[]> = signal([]);
 
-  private readonly STORAGE_KEY = 'wallet_options';
+  private readonly STORAGE_KEY = "wallet_options";
   private readonly defaultOptions: WalletOptions = {
-    payloadEncryptionPreference: false,
+    payloadEncryptionPreference: true,
     numberOfProofs: false,
-    useSignedMetadata: false
+    useSignedMetadata: true,
+    useDPoP: true,
+    useProtectedIssuance: false,
   };
 
-  private walletOptions: WritableSignal<WalletOptions> = signal(this.loadOptions());
+  private walletOptions: WritableSignal<WalletOptions> = signal(
+    this.loadOptions(),
+  );
 
   constructor() {
     this.initializeOptions();
@@ -44,16 +56,19 @@ export class WalletService {
         return JSON.parse(stored) as WalletOptions;
       }
     } catch (error) {
-      console.error('Failed to load wallet options from localStorage', error);
+      console.error("Failed to load wallet options from localStorage", error);
     }
     return this.defaultOptions;
   }
 
   private saveOptions(): void {
     try {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.walletOptions()));
+      localStorage.setItem(
+        this.STORAGE_KEY,
+        JSON.stringify(this.walletOptions()),
+      );
     } catch (error) {
-      console.error('Failed to save wallet options to localStorage', error);
+      console.error("Failed to save wallet options to localStorage", error);
     }
   }
 
@@ -72,7 +87,7 @@ export class WalletService {
   updatePayloadEncryptionPreference(value: boolean): void {
     this.walletOptions.update((options: WalletOptions) => ({
       ...options,
-      payloadEncryptionPreference: value
+      payloadEncryptionPreference: value,
     }));
     this.saveOptions();
   }
@@ -80,7 +95,15 @@ export class WalletService {
   updateNumberOfProofs(value: false | number): void {
     this.walletOptions.update((options: WalletOptions) => ({
       ...options,
-      numberOfProofs: value
+      numberOfProofs: value,
+    }));
+    this.saveOptions();
+  }
+
+  updateUseDpop(value: boolean): void {
+    this.walletOptions.update((options: WalletOptions) => ({
+      ...options,
+      useDPoP: value,
     }));
     this.saveOptions();
   }
@@ -88,7 +111,15 @@ export class WalletService {
   updateUseSignedMetadata(value: boolean): void {
     this.walletOptions.update((options: WalletOptions) => ({
       ...options,
-      useSignedMetadata: value
+      useSignedMetadata: value,
+    }));
+    this.saveOptions();
+  }
+
+  updateUseProtectedIssuance(value: boolean): void {
+    this.walletOptions.update((options: WalletOptions) => ({
+      ...options,
+      useProtectedIssuance: value,
     }));
     this.saveOptions();
   }
@@ -109,18 +140,25 @@ export class WalletService {
     return this.ephemeralPrivateKey;
   }
 
-  private getCredentialConfig(metadata: OpenIdMetadataResponse) {
-    const entries = Object.entries(metadata.credential_configurations_supported ?? {});
+  private getCredentialConfig(
+    metadata: OpenIdMetadataResponse,
+    configId: string,
+  ) {
+    const entries = Object.entries(
+      metadata.credential_configurations_supported ?? {},
+    );
 
     if (!entries.length) {
-      throw new Error('No credential configurations available');
+      throw new Error("No credential configurations available");
     }
 
-    const [credentialConfigurationId, credentialConfiguration] = entries[0];
+    const [credentialConfigurationId, credentialConfiguration] =
+      entries.find(([id]) => id === configId) ?? entries[0];
 
     return {
       credentialConfigurationId: credentialConfigurationId as string,
-      credentialConfiguration: credentialConfiguration as CredentialConfiguration
+      credentialConfiguration:
+        credentialConfiguration as CredentialConfiguration,
     };
   }
 
@@ -133,31 +171,84 @@ export class WalletService {
       throw new Error("Missing token");
     }
     const decoded = jose.decodeJwt(token) as JwtPayload;
-    const did = decoded['iss'] as string
+    const did = decoded["iss"] as string;
     if (!did) {
       throw new Error("Cannot find the iss");
     }
     const parts = did.split(":");
-    return `https://${decodeURIComponent(did.substring(did.indexOf(parts[3]), did.length).replace(/:/g, "/"))}/did.jsonl`
+    return `https://${decodeURIComponent(did.substring(did.indexOf(parts[3]), did.length).replace(/:/g, "/"))}/did.jsonl`;
   }
 
-  public async decodeJwt(jwt: string, registryEntry: RegistryEntry[]): Promise<{ payload: JwtPayload, protectedHeader: JwtPayload, }> {
-    const kid = (jose.decodeProtectedHeader(jwt) as JwtPayload)['kid'];
-    const verificationMethods = (registryEntry[3] as Record<string, unknown>)?.['value'] as Record<string, unknown>;
-    const verificationMethod = ((verificationMethods?.['verificationMethod'] as Record<string, unknown>[]) || [])
-      .map(meth => (meth as Record<string, unknown>)['id'] === kid ? meth : null)
-      .filter((meth: Record<string, unknown> | null): meth is Record<string, unknown> => meth != null)[0];
-    const jwk = verificationMethod?.['publicKeyJwk'] as CryptoKey;
-    const { payload, protectedHeader } = await jose.jwtVerify(jwt, jwk, {})
-    return { payload: payload as JwtPayload, protectedHeader: protectedHeader as JwtPayload };
+  public async decodeJwt(
+    jwt: string,
+    registryEntry: Record<string, unknown>,
+  ): Promise<{ payload: JwtPayload; protectedHeader: JwtPayload }> {
+    const kid = (jose.decodeProtectedHeader(jwt) as JwtPayload)["kid"];
+    const verificationMethods = (registryEntry[
+      "state"
+    ] as any);
+
+    console.log("Decoding JWT with registry entry", { jwt, kid, verificationMethods });
+    const verificationMethod = (
+      (verificationMethods?.["verificationMethod"] as Record<
+        string,
+        unknown
+      >[]) || []
+    )
+      .map((meth) =>
+        (meth as Record<string, unknown>)["id"] === kid ? meth : null,
+      )
+      .filter(
+        (
+          meth: Record<string, unknown> | null,
+        ): meth is Record<string, unknown> => meth != null,
+      )[0];
+    const jwk = verificationMethod?.["publicKeyJwk"] as CryptoKey;
+    const { payload, protectedHeader } = await jose.jwtVerify(jwt, jwk, {});
+    return {
+      payload: payload as JwtPayload,
+      protectedHeader: protectedHeader as JwtPayload,
+    };
+  }
+
+  public async decodeJwtWithListRegistry(
+    jwt: string,
+    registryEntry: RegistryEntry[],
+  ): Promise<{ payload: JwtPayload; protectedHeader: JwtPayload }> {
+    const kid = (jose.decodeProtectedHeader(jwt) as JwtPayload)["kid"];
+    const verificationMethods = (registryEntry[3] as Record<string, unknown>)?.[
+      "value"
+    ] as Record<string, unknown>;
+    const verificationMethod = (
+      (verificationMethods?.["verificationMethod"] as Record<
+        string,
+        unknown
+      >[]) || []
+    )
+      .map((meth) =>
+        (meth as Record<string, unknown>)["id"] === kid ? meth : null,
+      )
+      .filter(
+        (
+          meth: Record<string, unknown> | null,
+        ): meth is Record<string, unknown> => meth != null,
+      )[0];
+    const jwk = verificationMethod?.["publicKeyJwk"] as CryptoKey;
+    const { payload, protectedHeader } = await jose.jwtVerify(jwt, jwk, {});
+    return {
+      payload: payload as JwtPayload,
+      protectedHeader: protectedHeader as JwtPayload,
+    };
   }
 
   async buildRequestCredential(
     metadata: OpenIdMetadataResponse,
     nonce: NonceResponse,
+    configId: string,
     proofsSizePreference: number | null = null,
     encryptionPreference = false,
   ): Promise<CreateCredentialRequest | string> {
+    console.log("metadata", metadata);
 
     const buildEncrypted =
       metadata.credential_request_encryption?.encryption_required ||
@@ -171,28 +262,30 @@ export class WalletService {
     const credentialIssuer = metadata.credential_issuer as string;
 
     if (!credentialIssuer) {
-      throw new Error('No credentialIssuer available');
+      throw new Error("No credentialIssuer available");
     }
 
     const { credentialConfigurationId, credentialConfiguration } =
-      this.getCredentialConfig(metadata);
+      this.getCredentialConfig(metadata, configId);
 
-    const format = credentialConfiguration?.['format'] as string;
+    const format = credentialConfiguration?.["format"] as string;
 
     if (!format) {
-      throw new Error('No format available');
+      throw new Error("No format available");
     }
 
-    const proofAlg = credentialConfiguration?.proof_types_supported?.['jwt'].proof_signing_alg_values_supported?.[0]
-      
+    const proofAlg =
+      credentialConfiguration?.proof_types_supported?.["jwt"]
+        .proof_signing_alg_values_supported?.[0];
+
     if (!proofAlg) {
-      throw new Error('No proof signing algorithm available');
+      throw new Error("No proof signing algorithm available");
     }
 
     const proofs = {
-      proof_type: 'jwt',
+      proof_type: "jwt",
       jwt: [] as string[],
-    }
+    };
 
     this.generatedProofKeyPairs = [];
 
@@ -203,7 +296,7 @@ export class WalletService {
           namedCurve: "P-256",
         },
         true,
-        ["sign", "verify"]
+        ["sign", "verify"],
       );
 
       const jwk = await jose.exportJWK(publicKey);
@@ -211,7 +304,7 @@ export class WalletService {
       this.generatedProofKeyPairs.push({
         proofIndex: i,
         privateKey,
-        jwk
+        jwk,
       });
 
       const jwt = await this.buildHolderBindingWithKey(
@@ -220,7 +313,7 @@ export class WalletService {
         nonce.c_nonce,
         proofAlg,
         privateKey,
-        jwk
+        jwk,
       );
       proofs.jwt.push(jwt);
     }
@@ -231,9 +324,12 @@ export class WalletService {
       proofs,
     };
 
-    const keyPair = await this.cryptoService.generateEphemeralKeyPair("ECDH-ES");
+    const keyPair =
+      await this.cryptoService.generateEphemeralKeyPair("ECDH-ES");
     this.setEphemeralPrivateKey(keyPair.privateKey);
-    const publicJwk = await this.cryptoService.exportPublicJwk(keyPair.publicKey);
+    const publicJwk = await this.cryptoService.exportPublicJwk(
+      keyPair.publicKey,
+    );
 
     if (buildEncrypted) {
       const encConfig = metadata.credential_response_encryption;
@@ -249,32 +345,34 @@ export class WalletService {
         };
       }
 
-      const requestEnc = metadata.credential_request_encryption
+      const requestEnc = metadata.credential_request_encryption;
       const jwk = requestEnc?.jwks?.keys?.[0];
       const alg = jwk?.alg ? jwk?.alg : encConfig.alg_values_supported[0];
       const enc = requestEnc?.enc_values_supported?.[0];
       const zip = requestEnc?.zip_values_supported?.[0];
 
       if (!jwk) {
-        throw new Error('No encryption key available in credential_request_encryption.jwks.keys');
+        throw new Error(
+          "No encryption key available in credential_request_encryption.jwks.keys",
+        );
       }
       if (!alg) {
-        throw new Error('No alg available in credential_request_encryption.jwks.keys');
+        throw new Error(
+          "No alg available in credential_request_encryption.jwks.keys",
+        );
       }
       if (!enc) {
-        throw new Error('No encryption value available in credential_request_encryption.enc_values_supported');
+        throw new Error(
+          "No encryption value available in credential_request_encryption.enc_values_supported",
+        );
       }
       if (!zip) {
-        throw new Error('No encryption value available in credential_request_encryption.zip_values_supported');
+        throw new Error(
+          "No encryption value available in credential_request_encryption.zip_values_supported",
+        );
       }
 
-      return this.cryptoService.encryptPayload(
-        payload,
-        jwk,
-        alg,
-        enc,
-        zip,
-      );
+      return this.cryptoService.encryptPayload(payload, jwk, alg, enc, zip);
     }
 
     return payload;
@@ -287,16 +385,20 @@ export class WalletService {
     alg: string,
   ): Promise<string> {
     const claims: Record<string, unknown> = {
-      "aud": audience,
-      "iat": now,
-      "nonce": nonce,
-    }
+      aud: audience,
+      iat: now,
+      nonce: nonce,
+    };
 
     const jwt = await new jose.SignJWT(claims)
-      .setProtectedHeader({ alg: alg, typ: 'openid4vci-proof+jwt', jwk: this.holderKeyService.getJwk() })
+      .setProtectedHeader({
+        alg: alg,
+        typ: "openid4vci-proof+jwt",
+        jwk: this.holderKeyService.getJwk(),
+      })
       .setIssuedAt(now)
       .setAudience(audience)
-      .setExpirationTime('2h')
+      .setExpirationTime("2h")
       .sign(this.holderKeyService.getPrivateKey());
 
     return jwt;
@@ -308,19 +410,19 @@ export class WalletService {
     nonce: string,
     alg: string,
     privateKey: CryptoKey,
-    jwk: jose.JWK
+    jwk: jose.JWK,
   ): Promise<string> {
     const claims: Record<string, unknown> = {
-      "aud": audience,
-      "iat": now,
-      "nonce": nonce,
-    }
+      aud: audience,
+      iat: now,
+      nonce: nonce,
+    };
 
     const jwt = await new jose.SignJWT(claims)
-      .setProtectedHeader({ alg: alg, typ: 'openid4vci-proof+jwt', jwk: jwk })
+      .setProtectedHeader({ alg: alg, typ: "openid4vci-proof+jwt", jwk: jwk })
       .setIssuedAt(now)
       .setAudience(audience)
-      .setExpirationTime('2h')
+      .setExpirationTime("2h")
       .sign(privateKey);
 
     return jwt;
@@ -330,14 +432,19 @@ export class WalletService {
     return this.generatedProofKeyPairs;
   }
 
-  async resolveResponseCredential(encryptedResponse: CredentialEndpointResponse | string) {
+  async resolveResponseCredential(
+    encryptedResponse: CredentialEndpointResponse | string,
+  ) {
     const privateKey = this.getEphemeralPrivateKey();
 
     if (!privateKey) {
-      throw new Error('Missing wallet ephemeral private key');
+      throw new Error("Missing wallet ephemeral private key");
     }
 
-    return this.cryptoService.decryptPayload(encryptedResponse, privateKey) as CredentialEndpointResponse;
+    return this.cryptoService.decryptPayload(
+      encryptedResponse,
+      privateKey,
+    ) as CredentialEndpointResponse;
   }
 
   getRequestedVCs(): WritableSignal<VCRecord[]> {
@@ -349,14 +456,14 @@ export class WalletService {
       id: `vc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       credentialType,
       issuedAt: new Date(),
-      sdJwt
+      sdJwt,
     };
 
-    this.requestedVCs.update(vcs => [...vcs, newVC]);
+    this.requestedVCs.update((vcs) => [...vcs, newVC]);
   }
 
   removeVC(id: string): void {
-    this.requestedVCs.update(vcs => vcs.filter(vc => vc.id !== id));
+    this.requestedVCs.update((vcs) => vcs.filter((vc) => vc.id !== id));
   }
 
   clearAll(): void {
@@ -366,5 +473,4 @@ export class WalletService {
   getVCCount(): number {
     return this.requestedVCs().length;
   }
-
 }
