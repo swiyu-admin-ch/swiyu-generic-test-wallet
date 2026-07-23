@@ -43,6 +43,7 @@ import { TrustService } from "@app/services/trust-service";
 import { WalletService } from "@app/services/wallet-service";
 import { OIDVCIService } from "@app/services/oidvci-service";
 import { DidResponse } from "@app/models/did-response";
+import { RegistryService } from "@app/services/registryService";
 
 type PayloadEncryptionStatus = {
   responseMode: string | undefined;
@@ -74,6 +75,7 @@ export class CredentialVerification implements OnInit {
   private oidvciService = inject(OIDVCIService);
   private oidvpService = inject(OIDVPService);
   private verificationService = inject(VerificationService);
+  private registryService = inject(RegistryService);
   private holderKeyService = inject(HolderKeyService);
   private sdJwtStore = inject(SdJwtStoreService);
   private vcKeyStore = inject(VcKeyStoreService);
@@ -330,20 +332,7 @@ export class CredentialVerification implements OnInit {
           return EMPTY;
         }),
         switchMap((entry: RegistryEntry[] | DidResponse) => {
-          if (entry instanceof Array) {
-            return EMPTY;
-          }
-
-          return from(
-            Promise.all(
-              entry.state.verificationMethod.map(
-                (vm) =>
-                  this.cryptoService.getCryptoKeyFromJwk(
-                    vm.publicKeyJwk,
-                  ) as Promise<CryptoKey>,
-              ),
-            ),
-          );
+          return this.registryService.getCryptoKeysFromRegistryEntry(entry);
         }),
         switchMap((cryptoKeys: CryptoKey[]) => {
           const statements = [
