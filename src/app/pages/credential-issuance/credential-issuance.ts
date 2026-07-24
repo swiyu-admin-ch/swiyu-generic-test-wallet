@@ -41,6 +41,7 @@ import { CryptoService } from "@app/services/crypto-service";
 import { ErrorFormatterService } from "@app/services/error-formatter-service";
 import { WalletService } from "@app/services/wallet-service";
 import { ApiService } from "@app/services/api-service";
+import { RegistryService } from "@app/services/registryService";
 import {
   DpopKeyPair,
   VcKeyStoreService,
@@ -80,6 +81,7 @@ import { DidResponse } from "@app/models/did-response";
 export class CredentialIssuance {
   private oidvciService = inject(OIDVCIService);
   private cryptoService = inject(CryptoService);
+  private registryService = inject(RegistryService);
   private deeplinkService = inject(DeeplinkService);
   private walletService = inject(WalletService);
   private apiService = inject(ApiService);
@@ -219,7 +221,6 @@ export class CredentialIssuance {
   nonce: WritableSignal<NonceResponse | undefined> = signal(undefined);
   nonceError = signal<Record<string, any> | string | undefined>(undefined);
 
-  nonceEndpointUrl: WritableSignal<string | undefined> = signal(undefined);
   dpopKeys: WritableSignal<DpopKeyPair | undefined> = signal(undefined);
 
   registryEntry: WritableSignal<RegistryEntry | RegistryEntry[] | undefined> =
@@ -345,7 +346,6 @@ export class CredentialIssuance {
           }
         }),
         switchMap(() => {
-          console.log("s", this.decodedIdTS());
           const credentialIssuerUrl = this.issuerMetadata()?.credential_issuer;
           if (!credentialIssuerUrl) {
             throw new Error("Missing credential_issuer");
@@ -366,7 +366,6 @@ export class CredentialIssuance {
           this.openIdConfiguration.set(openIdConfiguration);
         }),
         catchError((error) => {
-          console.error(error);
           this.openIdConfigurationError.set(this.errorFormatter.format(error));
           return EMPTY;
         }),
@@ -378,8 +377,6 @@ export class CredentialIssuance {
             throw new Error("Missing nonceEndpointUrl");
           }
 
-          this.nonceEndpointUrl.set(nonceEndpointUrl);
-
           return this.oidvciService.fetchNonce(nonceEndpointUrl);
         }),
         tap((nonce: NonceResponse) => {
@@ -387,7 +384,6 @@ export class CredentialIssuance {
           this.storeDpopKeys();
         }),
         catchError((error) => {
-          console.error(error);
           this.nonceError.set(this.errorFormatter.format(error));
           return EMPTY;
         }),
@@ -417,7 +413,7 @@ export class CredentialIssuance {
 
           return this.oidvciService.fetchAccessToken(
             tokenEndpointUrl,
-            this.nonceEndpointUrl()!,
+            this.issuerMetadata()?.nonce_endpoint!,
             preAuthCode,
             this.dpopKeys() || undefined,
           );
@@ -490,7 +486,7 @@ export class CredentialIssuance {
 
           return this.oidvciService.fetchCredential(
             credentialEndpointUrl,
-            this.nonceEndpointUrl()!,
+            this.issuerMetadata()?.nonce_endpoint!,
             payload,
             accessToken,
             this.walletService.getOptions().useDPoP
@@ -531,20 +527,9 @@ export class CredentialIssuance {
           this.registryEntryError.set(this.errorFormatter.format(error));
           return EMPTY;
         }),
-        switchMap((entry) => {
-          if (entry instanceof Array) {
-            return from(EMPTY);
-          } else {
-            return from(
-              (entry as DidResponse).state.verificationMethod.map(
-                (vm) =>
-                  this.cryptoService.getCryptoKeyFromJwk(
-                    vm.publicKeyJwk,
-                  ) as Promise<CryptoKey>,
-              ),
-            );
-          }
-        }),
+        switchMap((entry: RegistryEntry[] | DidResponse) =>
+          this.registryService.getCryptoKeysFromRegistryEntry(entry),
+        ),
         tap((cryptoKeys: CryptoKey[] | undefined) => {
           this.registryPublicKeys.set(cryptoKeys);
         }),
@@ -573,7 +558,7 @@ export class CredentialIssuance {
 
           const jwt = credential.split("~")[0];
 
-          if (this.Array.isArray(this.registryEntry())) {
+          if (Array.isArray(this.registryEntry())) {
             const registryEntry = this.registryEntry() as RegistryEntry[];
             return from(
               this.walletService.decodeJwtWithListRegistry(jwt, registryEntry),
@@ -597,9 +582,6 @@ export class CredentialIssuance {
           ),
         ),
         switchMap((statuslistEntry) => {
-          console.log("decoded payload", this.decodedPayload());
-          const trustRoot =
-            "did:webvh:QmQNMXCBYHLsH5zJeE1hC6tn7GpQFfvqJaWPqwpn7pafcy:identifier-reg-a.trust-infra.swiyu-int.admin.ch:api:v1:did:3d20b010-8d39-4cdd-b5cd-a6356b4e1218";
           this.trustStatementVerifierService.initialize(
             [
               this.trustStatements()?.idTS!,

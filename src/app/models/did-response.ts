@@ -12,17 +12,7 @@ export interface DidResponse {
     id: string;
     authentication: string[];
     assertionMethod: string[];
-    verificationMethod: {
-      id: string;
-      type: string;
-      publicKeyJwk: {
-        kty: string;
-        crv: string;
-        x: string;
-        y: string;
-        kid: string;
-      };
-    }[];
+    verificationMethod: VerificationMethod[];
     proof: {
       type: string;
       cryptosuite: string;
@@ -32,4 +22,18 @@ export interface DidResponse {
       proofValue: string;
     }[];
   };
+}
+
+export interface VerificationMethod {
+  id: string;
+  type: string;
+  publicKeyJwk: PublicKeyJwk;
+}
+
+export interface PublicKeyJwk {
+  kty: string;
+  crv: string;
+  x: string;
+  y: string;
+  kid: string;
 }

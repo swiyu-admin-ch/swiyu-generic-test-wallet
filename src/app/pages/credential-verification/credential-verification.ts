@@ -43,6 +43,7 @@ import { TrustService } from "@app/services/trust-service";
 import { WalletService } from "@app/services/wallet-service";
 import { OIDVCIService } from "@app/services/oidvci-service";
 import { DidResponse } from "@app/models/did-response";
+import { RegistryService } from "@app/services/registryService";
 
 type PayloadEncryptionStatus = {
   responseMode: string | undefined;
@@ -74,6 +75,7 @@ export class CredentialVerification implements OnInit {
   private oidvciService = inject(OIDVCIService);
   private oidvpService = inject(OIDVPService);
   private verificationService = inject(VerificationService);
+  private registryService = inject(RegistryService);
   private holderKeyService = inject(HolderKeyService);
   private sdJwtStore = inject(SdJwtStoreService);
   private vcKeyStore = inject(VcKeyStoreService);
@@ -312,8 +314,13 @@ export class CredentialVerification implements OnInit {
         }),
         switchMap(() => {
           const did = this.requestObject()?.parsed?.iss! as string;
-          const parts = did.split(":");
-          const registryEntry = `https://${decodeURIComponent(did.substring(did.indexOf(parts[3]), did.length).replace(/:/g, "/"))}/did.jsonl`;
+          const didWithRemovedPrefix = did.startsWith(
+            "decentralized_identifier:",
+          )
+            ? did.split("decentralized_identifier:")[1]
+            : did;
+          const parts = didWithRemovedPrefix.split(":");
+          const registryEntry = `https://${decodeURIComponent(didWithRemovedPrefix.substring(didWithRemovedPrefix.indexOf(parts[3]), didWithRemovedPrefix.length).replace(/:/g, "/"))}/did.jsonl`;
           return this.oidvciService.fetchRegistryEntry(registryEntry);
         }),
         tap((entry: RegistryEntry[]) => {
@@ -330,20 +337,7 @@ export class CredentialVerification implements OnInit {
           return EMPTY;
         }),
         switchMap((entry: RegistryEntry[] | DidResponse) => {
-          if (entry instanceof Array) {
-            return EMPTY;
-          }
-
-          return from(
-            Promise.all(
-              entry.state.verificationMethod.map(
-                (vm) =>
-                  this.cryptoService.getCryptoKeyFromJwk(
-                    vm.publicKeyJwk,
-                  ) as Promise<CryptoKey>,
-              ),
-            ),
-          );
+          return this.registryService.getCryptoKeysFromRegistryEntry(entry);
         }),
         switchMap((cryptoKeys: CryptoKey[]) => {
           const statements = [
@@ -405,6 +399,8 @@ export class CredentialVerification implements OnInit {
         switchMap(() => {
           const dcqlCredentials = this.dcql()?.query?.credentials ?? [];
           const credentialId = dcqlCredentials[0]?.id || "credential_1";
+
+          console.log("submitVerificationResponse");
 
           return this.oidvpService.submitVerificationResponse(
             this.requestObject()?.parsed!,
