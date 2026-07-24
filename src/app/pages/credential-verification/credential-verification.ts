@@ -314,8 +314,13 @@ export class CredentialVerification implements OnInit {
         }),
         switchMap(() => {
           const did = this.requestObject()?.parsed?.iss! as string;
-          const parts = did.split(":");
-          const registryEntry = `https://${decodeURIComponent(did.substring(did.indexOf(parts[3]), did.length).replace(/:/g, "/"))}/did.jsonl`;
+          const didWithRemovedPrefix = did.startsWith(
+            "decentralized_identifier:",
+          )
+            ? did.split("decentralized_identifier:")[1]
+            : did;
+          const parts = didWithRemovedPrefix.split(":");
+          const registryEntry = `https://${decodeURIComponent(didWithRemovedPrefix.substring(didWithRemovedPrefix.indexOf(parts[3]), didWithRemovedPrefix.length).replace(/:/g, "/"))}/did.jsonl`;
           return this.oidvciService.fetchRegistryEntry(registryEntry);
         }),
         tap((entry: RegistryEntry[]) => {
@@ -394,6 +399,8 @@ export class CredentialVerification implements OnInit {
         switchMap(() => {
           const dcqlCredentials = this.dcql()?.query?.credentials ?? [];
           const credentialId = dcqlCredentials[0]?.id || "credential_1";
+
+          console.log("submitVerificationResponse");
 
           return this.oidvpService.submitVerificationResponse(
             this.requestObject()?.parsed!,
