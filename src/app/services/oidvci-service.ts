@@ -79,14 +79,19 @@ export class OIDVCIService {
     nonceEndpointUrl: string,
     preAuthCode: string,
     dpopKeys?: DpopKeyPair,
+    transactionCode?: string,
   ): Observable<OAuthToken> {
     if (!preAuthCode || !tokenEndpointUrl) {
       throw new Error("Missing pre-authorized code or token endpoint");
     }
 
-    const body = new HttpParams()
+    let body = new HttpParams()
       .set("grant_type", "urn:ietf:params:oauth:grant-type:pre-authorized_code")
       .set("pre-authorized_code", preAuthCode);
+
+    if (transactionCode !== undefined) {
+      body = body.set("tx_code", transactionCode);
+    }
 
     const nonce$ = this.fetchNonce(nonceEndpointUrl);
     const proof$ = nonce$.pipe(
