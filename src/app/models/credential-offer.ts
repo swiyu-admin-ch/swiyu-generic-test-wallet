@@ -7,6 +7,13 @@ export interface CredentialOffer {
 
 export interface GrantConfig {
   "pre-authorized_code"?: string;
+  tx_code?: TransactionCode;
   user_pin?: string;
   [key: string]: unknown;
+}
+
+export interface TransactionCode {
+  input_mode?: "numeric" | "text";
+  length?: number;
+  description?: string;
 }
