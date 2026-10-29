@@ -5,7 +5,7 @@ import {
   OpenIdMetadataResponse,
   RegistryEntry,
 } from "@app/models/api-response";
-import { Observable, from, of, switchMap } from "rxjs";
+import { Observable, from, map, of, switchMap } from "rxjs";
 import { CredentialEndpointResponse } from "src/generated/issuer";
 import { NonceResponse } from "src/generated/issuer/model/nonceResponse";
 import { OAuthToken } from "src/generated/issuer/model/oAuthToken";
@@ -185,6 +185,9 @@ export class OIDVCIService {
   public fetchRegistryEntry(
     registryEntryUrl: string,
   ): Observable<RegistryEntry[] | DidResponse> {
-    return this.http.get<RegistryEntry[] | DidResponse>(registryEntryUrl);
+    // did.jsonl has one entry per DID version, the last one is the current state
+    return this.http
+      .get(registryEntryUrl, { responseType: "text" })
+      .pipe(map((body) => JSON.parse(body.trim().split("\n").pop()!)));
   }
 }

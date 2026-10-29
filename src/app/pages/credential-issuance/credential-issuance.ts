@@ -118,6 +118,9 @@ export class CredentialIssuance {
   );
   decodedIdTS: WritableSignal<TrustStatement | undefined> = signal(undefined);
   trustMarkers: WritableSignal<TrustMarkers | undefined> = signal(undefined);
+  trustMarkersError = signal<Record<string, any> | string | undefined>(
+    undefined,
+  );
 
   trustStatements: WritableSignal<
     | {
@@ -127,9 +130,24 @@ export class CredentialIssuance {
         ncTLSDecoded?: TrustStatement;
         piTLS?: string;
         piTLSDecoded?: TrustStatement;
+        piaTS?: string;
+        piaTSDecoded?: TrustStatement;
       }
     | undefined
   > = signal(undefined);
+
+  vctAuthorization = computed(() => {
+    const markers = this.trustMarkers();
+    if (!markers) {
+      return undefined;
+    }
+    if (!markers.governedUseCaseTrustMarker) {
+      return { valid: true, text: "Vct is not protected" };
+    }
+    return markers.governedUseCaseAuthorizationTrustMarker
+      ? { valid: true, text: "Issuer is authorized for protected vct" }
+      : { valid: false, text: "Issuer is not authorized for protected vct" };
+  });
 
   public issuerMetadataResponseJwtHeader = computed<JwtPayload | undefined>(
     () => {
@@ -582,19 +600,42 @@ export class CredentialIssuance {
           ),
         ),
         switchMap((statuslistEntry) => {
+          const configId =
+            this.credentialOffer()!.credential_configuration_ids[0];
+          const credentialConfiguration =
+            this.credentialConfigurationsSupported()?.[configId] as
+              | Record<string, any>
+              | undefined;
+          const piaTS: string | undefined =
+            credentialConfiguration?.[
+              "protected_issuance_authorization_trust_statement"
+            ];
+          if (piaTS) {
+            this.trustStatements.update((current) => ({
+              ...current,
+              piaTS,
+              piaTSDecoded:
+                this.cryptoService.decodeIfJwt<TrustStatement>(piaTS),
+            }));
+          }
+
           this.trustStatementVerifierService.initialize(
             [
-              this.trustStatements()?.idTS!,
-              this.trustStatements()?.ncTLS!,
-              this.trustStatements()?.piTLS!,
-            ],
+              this.trustStatements()?.idTS,
+              this.trustStatements()?.ncTLS,
+              this.trustStatements()?.piTLS,
+              piaTS,
+            ].filter((statement): statement is string => !!statement),
             {
               allowedHosts: environment.allowedHosts,
             },
           );
           return this.trustStatementVerifierService.verifyIssuanceStatements(
             environment.trustRoot,
-            this.issuerMetadata()?.iss?.split("#")[0] as string,
+            (
+              (this.issuerMetadata()?.iss ??
+                this.decodedPayload()?.["iss"]) as string
+            ).split("#")[0],
             this.decodedPayload()!["vct"] as string,
             this.registryPublicKeys() ?? [],
             statuslistEntry,
@@ -603,6 +644,11 @@ export class CredentialIssuance {
         tap((verificationResult) => {
           this.trustMarkers.set(verificationResult.markers);
           this.trustMarkers()?.isTrustedIssuer();
+        }),
+        catchError((error) => {
+          console.error(error);
+          this.trustMarkersError.set(this.errorFormatter.format(error));
+          return EMPTY;
         }),
       )
       .subscribe(() => {
@@ -658,6 +704,8 @@ export class CredentialIssuance {
     this.credentialResponseEncryption.set(undefined);
     this.decodedIdTS.set(undefined);
     this.trustStatements.set(undefined);
+    this.trustMarkers.set(undefined);
+    this.trustMarkersError.set(undefined);
   }
 
   public checkIfKeyPresent = computed(() => {
