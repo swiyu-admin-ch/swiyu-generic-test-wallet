@@ -53,7 +53,15 @@ export class WalletService {
     try {
       const stored = localStorage.getItem(this.STORAGE_KEY);
       if (stored) {
-        return JSON.parse(stored) as WalletOptions;
+        const options = JSON.parse(stored) as Partial<WalletOptions> | null;
+        return {
+          ...this.defaultOptions,
+          ...options,
+          useDPoP:
+            typeof options?.useDPoP === "boolean"
+              ? options.useDPoP
+              : this.defaultOptions.useDPoP,
+        };
       }
     } catch (error) {
       console.error("Failed to load wallet options from localStorage", error);

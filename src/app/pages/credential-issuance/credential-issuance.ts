@@ -256,8 +256,6 @@ export class CredentialIssuance {
   nonce: WritableSignal<NonceResponse | undefined> = signal(undefined);
   nonceError = signal<Record<string, any> | string | undefined>(undefined);
 
-  dpopKeys: WritableSignal<DpopKeyPair | undefined> = signal(undefined);
-
   registryEntry: WritableSignal<RegistryEntry | RegistryEntry[] | undefined> =
     signal(undefined);
   registryPublicKeys: WritableSignal<CryptoKey[] | undefined> =
@@ -297,6 +295,8 @@ export class CredentialIssuance {
 
   public onResolve(input: string): void {
     this.reset();
+    const { useDPoP } = this.walletService.getOptions();
+    let dpopKeys: DpopKeyPair | undefined;
 
     from([input])
       .pipe(
@@ -414,23 +414,18 @@ export class CredentialIssuance {
 
           return this.oidvciService.fetchNonce(nonceEndpointUrl);
         }),
-        tap((nonce: NonceResponse) => {
-          this.nonce.set(nonce);
-          this.storeDpopKeys();
-        }),
+        tap((nonce: NonceResponse) => this.nonce.set(nonce)),
         catchError((error) => {
           this.nonceError.set(this.errorFormatter.format(error));
           return EMPTY;
         }),
         switchMap(() =>
-          this.walletService.getOptions().useDPoP
+          useDPoP
             ? from(this.vcKeyStore.generateDpopKeyPair())
             : of(undefined),
         ),
-        tap((dpopKeys: DpopKeyPair | undefined) => {
-          this.dpopKeys.set(dpopKeys);
-        }),
-        switchMap(() => {
+        switchMap((keys: DpopKeyPair | undefined) => {
+          dpopKeys = keys;
           const tokenEndpointUrl = this.openIdConfiguration()?.[
             "token_endpoint"
           ] as string;
@@ -465,7 +460,7 @@ export class CredentialIssuance {
                 tokenEndpointUrl,
                 nonceEndpointUrl,
                 preAuthCode,
-                this.dpopKeys() || undefined,
+                keys,
                 code,
               ).pipe(
                 catchError((error) => {
@@ -552,9 +547,7 @@ export class CredentialIssuance {
             this.issuerMetadata()?.nonce_endpoint!,
             payload,
             accessToken,
-            this.walletService.getOptions().useDPoP
-              ? this.dpopKeys()
-              : undefined,
+            dpopKeys,
           );
         }),
         switchMap((credentialResponse: CredentialEndpointResponse | string) => {
@@ -800,11 +793,6 @@ export class CredentialIssuance {
         .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
         .join(""),
     );
-  }
-
-  private async storeDpopKeys(): Promise<void> {
-    const keys = await this.vcKeyStore.generateDpopKeyPair();
-    this.dpopKeys.set(keys);
   }
 
   private async storeCredentialsWithKeys(
