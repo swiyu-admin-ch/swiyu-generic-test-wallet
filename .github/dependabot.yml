@@ -21,3 +21,7 @@ updates:
           - "rxjs"
           - "zone.js"
           - "tslib"
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
