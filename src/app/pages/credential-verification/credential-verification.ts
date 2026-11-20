@@ -1,11 +1,12 @@
 import {
   Component,
+  computed,
   inject,
   OnInit,
   signal,
   WritableSignal,
 } from "@angular/core";
-import { JWK, SignJWT } from "jose";
+import { decodeJwt, decodeProtectedHeader, JWK, JWTPayload, SignJWT } from "jose";
 import { FormsModule } from "@angular/forms";
 import { EMPTY, from, of, switchMap, tap, catchError } from "rxjs";
 import { ValidationPanelComponent } from "@components/validation-panel/validation-panel.component";
@@ -35,6 +36,7 @@ import { OIDVPService } from "@services/oidvp-service";
 import { CryptoService } from "@services/crypto-service";
 import { ErrorFormatterService } from "@services/error-formatter-service";
 import {
+  StatementType,
   TrustMarkers,
   TrustStatement,
   TrustVerificationResult,
@@ -50,6 +52,14 @@ type PayloadEncryptionStatus = {
   required: boolean;
   jwks: unknown;
   encValuesSupported: string[] | undefined;
+};
+
+type VerificationQueryStatementPayload = JWTPayload & {
+  request?: {
+    scope?: string;
+    type?: string;
+    query?: DcqlQueryDto;
+  };
 };
 
 @Component({
@@ -120,7 +130,6 @@ export class CredentialVerification implements OnInit {
 
   dcql: WritableSignal<
     | {
-        response?: DcqlQueryDto | string;
         query?: DcqlQueryDto | undefined;
         error?: Record<string, any> | string;
       }
@@ -163,17 +172,27 @@ export class CredentialVerification implements OnInit {
   trustStatements: WritableSignal<
     | {
         idTS?: string;
-        idTSDecoded?: TrustStatement | undefined;
+        idTSDecoded?: JWTPayload;
         pvaTS?: string | undefined;
         pvaTSDecoded?: TrustStatement | undefined;
         ncTLS?: string;
         ncTLSDecoded?: TrustStatement;
         vqPS?: string;
-        vqPSDecoded?: TrustStatement;
+        vqPSDecoded?: VerificationQueryStatementPayload;
         markers?: TrustMarkers;
       }
     | undefined
   > = signal(undefined);
+
+  private readonly verifierDid = computed(() => {
+    const clientId = this.requestObject()?.parsed?.client_id;
+    return clientId && this.stripDidPrefix(clientId);
+  });
+
+  readonly idTSMatchesClientId = computed(() => {
+    const subject = this.trustStatements()?.idTSDecoded?.sub;
+    return Boolean(subject && subject === this.verifierDid());
+  });
 
   ngOnInit(): void {
     const requestedVCs = this.walletService.getRequestedVCs()();
@@ -232,17 +251,17 @@ export class CredentialVerification implements OnInit {
           this.requestObject.update((current) => ({
             ...current,
             response: requestObjectResponse,
-            parsed: this.cryptoService.decodeIfJwt<RequestObject>(
-              requestObjectResponse,
-            ),
+            parsed: typeof requestObjectResponse === "string"
+              ? decodeJwt<RequestObject>(requestObjectResponse)
+              : requestObjectResponse,
           }));
+          const [idTS] = this.verifierInfoJwts(
+            StatementType.IDENTITY_TRUST_STATEMENT,
+          );
           this.trustStatements.update((current) => ({
             ...current,
-            idTS: this.requestObject()?.parsed?.verifier_info?.at(0)?.data,
-            idTSDecoded: this.cryptoService.decodeIfJwt<TrustStatement>(
-              this.requestObject()?.parsed?.verifier_info?.at(0)
-                ?.data as string,
-            ),
+            idTS,
+            idTSDecoded: idTS ? decodeJwt(idTS) : undefined,
           }));
         }),
         catchError((error) => {
@@ -253,10 +272,8 @@ export class CredentialVerification implements OnInit {
           return EMPTY;
         }),
         tap(() => {
-          const dcqlQuery = this.getDCQLQueryFromRequestObject();
-
-          console.log("dcqlQuery", dcqlQuery);
-          this.dcql.update((current) => ({ ...current, query: dcqlQuery }));
+          const query = this.getDCQLQueryFromRequestObject();
+          this.dcql.update((current) => ({ ...current, query }));
         }),
         catchError((error) => {
           this.dcql.update((current) => ({
@@ -295,7 +312,7 @@ export class CredentialVerification implements OnInit {
         }),
         switchMap(() =>
           this.trustService.getVerificationTrustStatements(
-            this.requestObject()?.parsed?.client_id as string,
+            this.verifierDid()!,
           ),
         ),
         tap((response) => {
@@ -313,14 +330,11 @@ export class CredentialVerification implements OnInit {
           }));
         }),
         switchMap(() => {
-          const did = this.requestObject()?.parsed?.iss! as string;
-          const didWithRemovedPrefix = did.startsWith(
-            "decentralized_identifier:",
-          )
-            ? did.split("decentralized_identifier:")[1]
-            : did;
-          const parts = didWithRemovedPrefix.split(":");
-          const registryEntry = `https://${decodeURIComponent(didWithRemovedPrefix.substring(didWithRemovedPrefix.indexOf(parts[3]), didWithRemovedPrefix.length).replace(/:/g, "/"))}/did.jsonl`;
+          const did = this.stripDidPrefix(
+            this.requestObject()?.parsed?.iss ?? "",
+          );
+          const parts = did.split(":");
+          const registryEntry = `https://${decodeURIComponent(did.substring(did.indexOf(parts[3])).replace(/:/g, "/"))}/did.jsonl`;
           return this.oidvciService.fetchRegistryEntry(registryEntry);
         }),
         tap((entry: RegistryEntry[]) => {
@@ -358,7 +372,7 @@ export class CredentialVerification implements OnInit {
             this.trustStatementVerifierService.verifyVerifierStatements(
               environment.trustRoot,
               this.trustStatements()?.pvaTSDecoded?.iss!,
-              this.requestObject()?.parsed?.iss?.toString() ?? "",
+              this.verifierDid() ?? "",
               cryptoKeys,
               // this is a mock at the moment as it isn't checked at the moment
               [
@@ -708,29 +722,66 @@ export class CredentialVerification implements OnInit {
   }
 
   private getDCQLQueryFromRequestObject(): DcqlQueryDto {
-    this.dcql.update((current) => ({
-      ...current,
-      response: this.requestObject()?.parsed?.dcql_query!,
-    }));
-    if (
-      this.requestObject()?.parsed?.scope === undefined &&
-      this.requestObject()?.parsed?.dcql_query !== undefined
-    ) {
-      return this.requestObject()?.parsed?.dcql_query!;
-    } else if (
-      this.requestObject()?.parsed?.scope !== undefined &&
-      this.requestObject()?.parsed?.verifier_info?.length! > 1
-    ) {
-      const decoded = this.cryptoService.decodeIfJwt<{
-        request: { query: DcqlQueryDto };
-      }>(this.requestObject()?.parsed?.verifier_info?.at(1)?.data as string);
-
-      console.log("test", decoded.request.query);
-
-      return decoded.request.query;
-    } else {
-      throw new Error("Missing DCQL query");
+    const requestObject = this.requestObject()?.parsed;
+    if (requestObject?.scope === undefined) {
+      if (!requestObject?.dcql_query) {
+        throw new Error("Missing DCQL query");
+      }
+      return requestObject.dcql_query;
     }
+
+    const scopes = requestObject.scope.split(" ");
+    const matchingStatements = this.verifierInfoJwts(
+      StatementType.VERIFICATION_QUERY_PUBLIC_STATEMENT,
+    )
+      .map((jwt) => ({
+        jwt,
+        decoded: decodeJwt<VerificationQueryStatementPayload>(jwt),
+      }))
+      .filter(({ decoded }) => {
+        const scope = decoded.request?.scope;
+        return scope && scopes.includes(scope);
+      });
+    if (matchingStatements.length === 0) {
+      throw new Error("No vqPS in verifier_info matches the request scope");
+    }
+    if (matchingStatements.length > 1) {
+      throw new Error("Multiple vqPS entries match the request scope");
+    }
+
+    const [{ jwt, decoded }] = matchingStatements;
+    this.trustStatements.update((current) => ({
+      ...current,
+      vqPS: jwt,
+      vqPSDecoded: decoded,
+    }));
+    if (!decoded.sub || decoded.sub !== this.verifierDid()) {
+      throw new Error("The vqPS subject does not match the verifier client_id");
+    }
+    if (
+      decoded.request?.type !== "DCQL" ||
+      !Array.isArray(decoded.request.query?.credentials)
+    ) {
+      throw new Error("The matching vqPS does not contain a DCQL query");
+    }
+    return decoded.request.query;
+  }
+
+  private verifierInfoJwts(type: StatementType): string[] {
+    return (this.requestObject()?.parsed?.verifier_info ?? []).flatMap((entry) => {
+      if (entry?.format !== "jwt" || typeof entry.data !== "string") {
+        return [];
+      }
+      try {
+        return decodeProtectedHeader(entry.data).typ === type ? [entry.data] : [];
+      } catch {
+        return [];
+      }
+    });
+  }
+
+  private stripDidPrefix(clientId: string): string {
+    return clientId.replace(/^decentralized_identifier:/, "");
   }
 
   private decodeDisclosure(disclosure: string): unknown[] | undefined {
