@@ -2,7 +2,7 @@
 
 # swiyu Generic Test Wallet
 
-The swiyu Generic Test Wallet is a web application that simulates a wallet to test credential issuance and verification flows based on OIDC4VCI and OIDC4VP.
+The swiyu Generic Test Wallet is a web application that simulates a wallet to test credential issuance and verification flows based on OID4VCI and OID4VP.
 
 It is primarily intended to validate your own deployment of the swiyu Generic [Issuer](https://github.com/swiyu-admin-ch/swiyu-issuer) and [Verifier](https://github.com/swiyu-admin-ch/swiyu-verifier) components. During integration or configuration phases, it allows developers to execute real issuance and verification flows end-to-end, starting from a deeplink and following the complete protocol exchange.
 
@@ -26,7 +26,7 @@ A public deployment of the swiyu Generic Test Wallet is available at:
 
 [https://swiyu-admin-ch.github.io/swiyu-generic-test-wallet/](https://swiyu-admin-ch.github.io/swiyu-generic-test-wallet/)
 
-You can use this online version to test your own swiyu Generic Issuer and Verifier deployments without running the Generic Test Wallet locally.
+The hosted wallet targets manual issuance and verification testing with swiyu Generic Issuer and Generic Verifier 5.x. You can use it to test your own deployments directly from GitHub Pages. For recent changes, see the [changelog](./CHANGELOG.md).
 
 **Important:** To use the demo against locally deployed backend services, you may need to disable browser CORS security.
 
@@ -38,10 +38,11 @@ Before starting the development server or building the application, ensure you h
 
 ### Required Software
 
-| Tool        | Version       | Purpose            |
-| ----------- | ------------- | ------------------ |
-| **Node.js** | 22.x or 24.x  | JavaScript runtime |
-| **npm**     | 9.x or higher | Package manager    |
+| Tool        | Version                | Purpose                     |
+| ----------- | ---------------------- | --------------------------- |
+| **Node.js** | 22.13+ (22.x) or 24.x   | JavaScript runtime          |
+| **npm**     | 9.x or higher          | Package manager             |
+| **Java**    | 11 or higher           | Run OpenAPI Generator       |
 
 ## Getting Started
 
@@ -56,7 +57,7 @@ nvm use 24
 2. **Install dependencies**:
 
 ```bash
-npm install
+npm ci
 ```
 
 3. **Generate API client classes** (required once, and after API spec updates):
@@ -65,7 +66,7 @@ npm install
 npm run generate:apis
 ```
 
-This command generates TypeScript Angular service classes from the OpenAPI specifications for both issuer and verifier APIs.
+This command generates Angular clients from the OpenAPI specifications for the issuer, verifier and trust APIs.
 
 ### Development Server
 
@@ -85,60 +86,48 @@ npm run build
 
 The build artifacts will be stored in the `dist/` directory.
 
-### Linting
+### Unit Tests and Linting
 
 ```bash
+npm test
 npm run lint
 ```
 
 ## Supported Features
 
-### Credential Issuance (OIDC4VCI)
+### Credential Issuance
 
-Supported:
-
-- Issuance V1
-  Single `vc+sd-jwt` credential
-- Issuance V2
-  Batch credential endpoint with support for multiple credentials
+- Credential offer links
+- Signed and unsigned metadata
+- Pre-authorized code flow
+- Transaction code
+- Single and batch issuance
+- SD-JWT credentials
 - Holder binding
-  Via `proof_type: jwt` (ES256)
-- Credential request encryption
-  (wallet --> issuer)
-- Credential response encryption
-  (issuer --> wallet)
-- DPoP (Demonstrating Proof of Possession)
+- Configurable proof count
+- Request and response encryption
+- DPoP
 
-Not yet supported (will be available in the future):
+### Credential Verification
 
-- Credential renewal flow
-
-### Credential Verification (OIDC4VP)
-
-Supported:
-
-- Verification V1
-  DIF Presentation Exchange, builds a selective-disclosure VP token with a `kb+jwt`.
-- Verification V2
-  DCQL (Digital Credentials Query Language) same flow using a DCQL query.
+- Verification links and request URLs
+- DCQL queries
 - Selective disclosure
-  Only the claims required by the verifier query are included in the VP token.
-- Key binding JWT (`kb+jwt`)
-  Appended to every VP token, bound to the holder key and the verifier nonce.
-- Response payload encryption (`direct_post.jwt`)
-  VP token is JWE-encrypted before submission.
+- Holder binding
+- Encrypted and unencrypted responses
 
-Not yet supported (will be available in the future):
+### Troubleshooting
 
-- DPoP (Demonstrating Proof of Possession)
+- Step-by-step results and errors
+- Issuer and verifier response inspection
+- DID resolution
+- Trust Protocol 2.0 diagnostics
 
-### Credential Storage and Session Management
+### Browser Session
 
-The wallet stores Verifiable Credentials (VCs) and their corresponding holder key pairs in the browser session memory. These credentials and keys are available only during the current session and are not persisted to disk or local storage.
-
-**Important:** When you refresh the page, all stored Verifiable Credentials and their associated holder key pairs are lost. The wallet generates new key pairs upon reloading. Previously issued VCs become unusable for verification because the original holder key pairs are no longer available.
-
-To complete a full issuance and verification flow, maintain a single browser session without refreshing the page until you have finished all operations.
+- In-memory credential and key storage
+- Credential copying and reuse in the same tab
+- Saved wallet settings
 
 ## Usage Guide
 
