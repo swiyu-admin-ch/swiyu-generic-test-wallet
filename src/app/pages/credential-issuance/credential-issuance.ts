@@ -1,13 +1,20 @@
 import {
   Component,
   computed,
+  DestroyRef,
   inject,
   signal,
   WritableSignal,
 } from "@angular/core";
 import { Credential } from "@app/components/credential-input/credential-input.component";
 import { FormsModule } from "@angular/forms";
-import { EMPTY, from, of, switchMap, catchError, map, tap } from "rxjs";
+import {
+  EMPTY, Observable, Subject, catchError, exhaustMap, from, of,
+  switchMap, take, takeUntil, tap, throwError,
+} from "rxjs";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
+import { HttpErrorResponse } from "@angular/common/http";
+import { MatButtonModule } from "@angular/material/button";
 import { ValidationPanelComponent } from "@components/validation-panel/validation-panel.component";
 import { ValidationItemComponent } from "@components/validation-item/validation-item.component";
 import { MatList } from "@angular/material/list";
@@ -71,6 +78,7 @@ import { DidResponse } from "@app/models/did-response";
     FormsModule,
     MatInputModule,
     MatFormFieldModule,
+    MatButtonModule,
     DeeplinkInput,
     DataViewerComponent,
     KeyValuePipe,
@@ -79,6 +87,9 @@ import { DidResponse } from "@app/models/did-response";
   standalone: true,
 })
 export class CredentialIssuance {
+  private destroyRef = inject(DestroyRef);
+  private resetFlow = new Subject<void>();
+  private transactionCodeSubmitted = new Subject<string>();
   private oidvciService = inject(OIDVCIService);
   private cryptoService = inject(CryptoService);
   private registryService = inject(RegistryService);
@@ -104,6 +115,12 @@ export class CredentialIssuance {
 
   credentialOffer: WritableSignal<CredentialOffer | undefined> =
     signal(undefined);
+  transactionCodeMetadata = computed(() => this.credentialOffer()?.grants?.[
+    "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+  ]?.tx_code);
+  transactionCodeInputMode = computed(() => this.transactionCodeMetadata()?.input_mode ?? "numeric");
+  awaitingTransactionCode = signal(false);
+  transactionCode = "";
   credentialOfferError = signal<Record<string, any> | string | undefined>(
     undefined,
   );
@@ -411,11 +428,39 @@ export class CredentialIssuance {
             throw new Error("Missing preAuthCode");
           }
 
-          return this.oidvciService.fetchAccessToken(
-            tokenEndpointUrl,
-            this.issuerMetadata()?.nonce_endpoint!,
-            preAuthCode,
-            this.dpopKeys() || undefined,
+          const nonceEndpointUrl = this.issuerMetadata()?.nonce_endpoint;
+          if (!nonceEndpointUrl) {
+            throw new Error("Missing nonceEndpointUrl");
+          }
+
+          const requiresCode = this.transactionCodeMetadata() !== undefined;
+          this.awaitingTransactionCode.set(requiresCode);
+          const code$: Observable<string | undefined> = requiresCode
+            ? this.transactionCodeSubmitted
+            : of(undefined);
+
+          return code$.pipe(
+            exhaustMap((code) => {
+              this.awaitingTransactionCode.set(false);
+              this.oAuthTokenError.set(undefined);
+              return this.oidvciService.fetchAccessToken(
+                tokenEndpointUrl,
+                nonceEndpointUrl,
+                preAuthCode,
+                this.dpopKeys() || undefined,
+                code,
+              ).pipe(
+                catchError((error) => {
+                  if (requiresCode && error instanceof HttpErrorResponse && error.error?.error === "invalid_tx_code") {
+                    this.oAuthTokenError.set(this.errorFormatter.format(error));
+                    this.awaitingTransactionCode.set(true);
+                    return EMPTY;
+                  }
+                  return throwError(() => error);
+                }),
+              );
+            }),
+            take(1),
           );
         }),
         tap((oAuthToken: OAuthToken) => {
@@ -604,6 +649,8 @@ export class CredentialIssuance {
           this.trustMarkers.set(verificationResult.markers);
           this.trustMarkers()?.isTrustedIssuer();
         }),
+        takeUntil(this.resetFlow),
+        takeUntilDestroyed(this.destroyRef),
       )
       .subscribe(() => {
         const credential =
@@ -626,7 +673,18 @@ export class CredentialIssuance {
       });
   }
 
+  public submitTransactionCode(): void {
+    if (this.awaitingTransactionCode() && this.transactionCode.length > 0) {
+      const code = this.transactionCode;
+      this.transactionCode = "";
+      this.transactionCodeSubmitted.next(code);
+    }
+  }
+
   public reset(): void {
+    this.resetFlow.next();
+    this.transactionCode = "";
+    this.awaitingTransactionCode.set(false);
     this.credentialOffer.set(undefined);
     this.credentialOfferError.set(undefined);
     this.issuerMetadataResponse.set(undefined);
