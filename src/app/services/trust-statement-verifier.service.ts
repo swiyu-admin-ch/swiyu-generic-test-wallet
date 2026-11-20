@@ -343,15 +343,14 @@ export class TrustStatementVerifierService {
     statements: Statement[],
     vct: string,
   ): void {
-    // If we have no information, assume the vct is governed
-    markers.governedUseCaseTrustMarker = true;
-
     for (const statement of statements) {
       if (
         statement.typ === StatementType.PROTECTED_ISSUANCE_TRUST_LIST_STATEMENT
       ) {
         const piTLS = statement as ProtectedIssuanceTrustListStatement;
-        markers.governedUseCaseTrustMarker = piTLS.vctValues.includes(vct);
+        if (piTLS.vctValues.includes(vct)) {
+          markers.governedUseCaseTrustMarker = true;
+        }
       }
 
       if (
@@ -359,9 +358,15 @@ export class TrustStatementVerifierService {
         StatementType.PROTECTED_ISSUANCE_AUTHORIZATION_TRUST_STATEMENT
       ) {
         const piaTS = statement as ProtectedIssuanceAuthorizationTrustStatement;
-        markers.governedUseCaseAuthorizationTrustMarker =
-          piaTS.canIssue.vct === vct;
+        if (piaTS.canIssue.vct === vct) {
+          markers.governedUseCaseAuthorizationTrustMarker = true;
+        }
       }
+    }
+
+    // An authorization is only relevant for a protected vct
+    if (!markers.governedUseCaseTrustMarker) {
+      markers.governedUseCaseAuthorizationTrustMarker = false;
     }
   }
 
