@@ -19,3 +19,4 @@ Changes are grouped by deployment date rather than version number.
 - Resolve the current DID document when `did.jsonl` contains multiple versions. [#115](https://github.com/swiyu-admin-ch/swiyu-generic-test-wallet/pull/115)
 - Use the issuer's `DPoP-Nonce` header for token and credential proofs. Retry the token request once when the issuer requests a fresh nonce and provides one. [#116](https://github.com/swiyu-admin-ch/swiyu-generic-test-wallet/pull/116)
 - Resolve verifier DID logs when the request object's `iss` uses the `decentralized_identifier:` prefix. Include the request object's `state` in OID4VP `direct_post` responses. [#110](https://github.com/swiyu-admin-ch/swiyu-generic-test-wallet/pull/110)
+- Resolve scoped verification requests by finding the matching query statement in `verifier_info` regardless of its position. Match the verifier's identity when the client ID includes the `decentralized_identifier:` prefix.
