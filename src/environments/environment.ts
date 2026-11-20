@@ -1,7 +1,7 @@
 export const environment = {
-    trustApiBaseUrl: 'https://trust-data-service-int-a.apps.p-szb-ros-shrd-npr-01.cloud.admin.ch',
+    trustApiBaseUrl: 'https://trust-reg.trust-infra.swiyu-int.admin.ch',
     allowedHosts: new Set([
-        'trust-data-service-int-a.apps.p-szb-ros-shrd-npr-01.cloud.admin.ch',
+        'trust-reg.trust-infra.swiyu-int.admin.ch',
     ]),
-    trustRoot: "did:webvh:QmQNMXCBYHLsH5zJeE1hC6tn7GpQFfvqJaWPqwpn7pafcy:identifier-reg-a.trust-infra.swiyu-int.admin.ch:api:v1:did:3d20b010-8d39-4cdd-b5cd-a6356b4e1218"
+    trustRoot: "did:webvh:QmdVPcfEJgvQAJKEjaTWAhskT1kc59KZQiXNenqHBB7iH5:identifier-reg.trust-infra.swiyu-int.admin.ch:api:v1:did:4c131dc4-ced1-454b-bbd4-9401c7512e37"
 };
