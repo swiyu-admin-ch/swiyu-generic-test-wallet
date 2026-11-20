@@ -1,13 +1,20 @@
 import {
   Component,
   computed,
+  DestroyRef,
   inject,
   signal,
   WritableSignal,
 } from "@angular/core";
 import { Credential } from "@app/components/credential-input/credential-input.component";
 import { FormsModule } from "@angular/forms";
-import { EMPTY, from, of, switchMap, catchError, map, tap } from "rxjs";
+import {
+  EMPTY, Observable, Subject, catchError, exhaustMap, from, of,
+  switchMap, take, takeUntil, tap, throwError,
+} from "rxjs";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
+import { HttpErrorResponse } from "@angular/common/http";
+import { MatButtonModule } from "@angular/material/button";
 import { ValidationPanelComponent } from "@components/validation-panel/validation-panel.component";
 import { ValidationItemComponent } from "@components/validation-item/validation-item.component";
 import { MatList } from "@angular/material/list";
@@ -41,6 +48,7 @@ import { CryptoService } from "@app/services/crypto-service";
 import { ErrorFormatterService } from "@app/services/error-formatter-service";
 import { WalletService } from "@app/services/wallet-service";
 import { ApiService } from "@app/services/api-service";
+import { RegistryService } from "@app/services/registryService";
 import {
   DpopKeyPair,
   VcKeyStoreService,
@@ -70,6 +78,7 @@ import { DidResponse } from "@app/models/did-response";
     FormsModule,
     MatInputModule,
     MatFormFieldModule,
+    MatButtonModule,
     DeeplinkInput,
     DataViewerComponent,
     KeyValuePipe,
@@ -78,8 +87,12 @@ import { DidResponse } from "@app/models/did-response";
   standalone: true,
 })
 export class CredentialIssuance {
+  private destroyRef = inject(DestroyRef);
+  private resetFlow = new Subject<void>();
+  private transactionCodeSubmitted = new Subject<string>();
   private oidvciService = inject(OIDVCIService);
   private cryptoService = inject(CryptoService);
+  private registryService = inject(RegistryService);
   private deeplinkService = inject(DeeplinkService);
   private walletService = inject(WalletService);
   private apiService = inject(ApiService);
@@ -102,6 +115,12 @@ export class CredentialIssuance {
 
   credentialOffer: WritableSignal<CredentialOffer | undefined> =
     signal(undefined);
+  transactionCodeMetadata = computed(() => this.credentialOffer()?.grants?.[
+    "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+  ]?.tx_code);
+  transactionCodeInputMode = computed(() => this.transactionCodeMetadata()?.input_mode ?? "numeric");
+  awaitingTransactionCode = signal(false);
+  transactionCode = "";
   credentialOfferError = signal<Record<string, any> | string | undefined>(
     undefined,
   );
@@ -219,7 +238,6 @@ export class CredentialIssuance {
   nonce: WritableSignal<NonceResponse | undefined> = signal(undefined);
   nonceError = signal<Record<string, any> | string | undefined>(undefined);
 
-  nonceEndpointUrl: WritableSignal<string | undefined> = signal(undefined);
   dpopKeys: WritableSignal<DpopKeyPair | undefined> = signal(undefined);
 
   registryEntry: WritableSignal<RegistryEntry | RegistryEntry[] | undefined> =
@@ -345,7 +363,6 @@ export class CredentialIssuance {
           }
         }),
         switchMap(() => {
-          console.log("s", this.decodedIdTS());
           const credentialIssuerUrl = this.issuerMetadata()?.credential_issuer;
           if (!credentialIssuerUrl) {
             throw new Error("Missing credential_issuer");
@@ -366,7 +383,6 @@ export class CredentialIssuance {
           this.openIdConfiguration.set(openIdConfiguration);
         }),
         catchError((error) => {
-          console.error(error);
           this.openIdConfigurationError.set(this.errorFormatter.format(error));
           return EMPTY;
         }),
@@ -378,8 +394,6 @@ export class CredentialIssuance {
             throw new Error("Missing nonceEndpointUrl");
           }
 
-          this.nonceEndpointUrl.set(nonceEndpointUrl);
-
           return this.oidvciService.fetchNonce(nonceEndpointUrl);
         }),
         tap((nonce: NonceResponse) => {
@@ -387,7 +401,6 @@ export class CredentialIssuance {
           this.storeDpopKeys();
         }),
         catchError((error) => {
-          console.error(error);
           this.nonceError.set(this.errorFormatter.format(error));
           return EMPTY;
         }),
@@ -415,11 +428,39 @@ export class CredentialIssuance {
             throw new Error("Missing preAuthCode");
           }
 
-          return this.oidvciService.fetchAccessToken(
-            tokenEndpointUrl,
-            this.nonceEndpointUrl()!,
-            preAuthCode,
-            this.dpopKeys() || undefined,
+          const nonceEndpointUrl = this.issuerMetadata()?.nonce_endpoint;
+          if (!nonceEndpointUrl) {
+            throw new Error("Missing nonceEndpointUrl");
+          }
+
+          const requiresCode = this.transactionCodeMetadata() !== undefined;
+          this.awaitingTransactionCode.set(requiresCode);
+          const code$: Observable<string | undefined> = requiresCode
+            ? this.transactionCodeSubmitted
+            : of(undefined);
+
+          return code$.pipe(
+            exhaustMap((code) => {
+              this.awaitingTransactionCode.set(false);
+              this.oAuthTokenError.set(undefined);
+              return this.oidvciService.fetchAccessToken(
+                tokenEndpointUrl,
+                nonceEndpointUrl,
+                preAuthCode,
+                this.dpopKeys() || undefined,
+                code,
+              ).pipe(
+                catchError((error) => {
+                  if (requiresCode && error instanceof HttpErrorResponse && error.error?.error === "invalid_tx_code") {
+                    this.oAuthTokenError.set(this.errorFormatter.format(error));
+                    this.awaitingTransactionCode.set(true);
+                    return EMPTY;
+                  }
+                  return throwError(() => error);
+                }),
+              );
+            }),
+            take(1),
           );
         }),
         tap((oAuthToken: OAuthToken) => {
@@ -490,7 +531,7 @@ export class CredentialIssuance {
 
           return this.oidvciService.fetchCredential(
             credentialEndpointUrl,
-            this.nonceEndpointUrl()!,
+            this.issuerMetadata()?.nonce_endpoint!,
             payload,
             accessToken,
             this.walletService.getOptions().useDPoP
@@ -531,20 +572,9 @@ export class CredentialIssuance {
           this.registryEntryError.set(this.errorFormatter.format(error));
           return EMPTY;
         }),
-        switchMap((entry) => {
-          if (entry instanceof Array) {
-            return from(EMPTY);
-          } else {
-            return from(
-              (entry as DidResponse).state.verificationMethod.map(
-                (vm) =>
-                  this.cryptoService.getCryptoKeyFromJwk(
-                    vm.publicKeyJwk,
-                  ) as Promise<CryptoKey>,
-              ),
-            );
-          }
-        }),
+        switchMap((entry: RegistryEntry[] | DidResponse) =>
+          this.registryService.getCryptoKeysFromRegistryEntry(entry),
+        ),
         tap((cryptoKeys: CryptoKey[] | undefined) => {
           this.registryPublicKeys.set(cryptoKeys);
         }),
@@ -573,7 +603,7 @@ export class CredentialIssuance {
 
           const jwt = credential.split("~")[0];
 
-          if (this.Array.isArray(this.registryEntry())) {
+          if (Array.isArray(this.registryEntry())) {
             const registryEntry = this.registryEntry() as RegistryEntry[];
             return from(
               this.walletService.decodeJwtWithListRegistry(jwt, registryEntry),
@@ -597,9 +627,6 @@ export class CredentialIssuance {
           ),
         ),
         switchMap((statuslistEntry) => {
-          console.log("decoded payload", this.decodedPayload());
-          const trustRoot =
-            "did:webvh:QmQNMXCBYHLsH5zJeE1hC6tn7GpQFfvqJaWPqwpn7pafcy:identifier-reg-a.trust-infra.swiyu-int.admin.ch:api:v1:did:3d20b010-8d39-4cdd-b5cd-a6356b4e1218";
           this.trustStatementVerifierService.initialize(
             [
               this.trustStatements()?.idTS!,
@@ -622,6 +649,8 @@ export class CredentialIssuance {
           this.trustMarkers.set(verificationResult.markers);
           this.trustMarkers()?.isTrustedIssuer();
         }),
+        takeUntil(this.resetFlow),
+        takeUntilDestroyed(this.destroyRef),
       )
       .subscribe(() => {
         const credential =
@@ -644,7 +673,18 @@ export class CredentialIssuance {
       });
   }
 
+  public submitTransactionCode(): void {
+    if (this.awaitingTransactionCode() && this.transactionCode.length > 0) {
+      const code = this.transactionCode;
+      this.transactionCode = "";
+      this.transactionCodeSubmitted.next(code);
+    }
+  }
+
   public reset(): void {
+    this.resetFlow.next();
+    this.transactionCode = "";
+    this.awaitingTransactionCode.set(false);
     this.credentialOffer.set(undefined);
     this.credentialOfferError.set(undefined);
     this.issuerMetadataResponse.set(undefined);

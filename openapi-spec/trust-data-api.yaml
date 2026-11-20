@@ -4,7 +4,7 @@ info:
   description: IF-007 - APIs for the Trust Registry Data Services
   version: 1.6.0
 servers:
-  - url: https://trust-data-service-d.apps.p-szb-ros-shrd-npr-01.cloud.admin.ch
+  - url: https://trust-reg.trust-infra.swiyu-int.admin.ch/
     description: Generated server url
 tags:
   - name: Statements 2.0
@@ -20,9 +20,11 @@ paths:
     get:
       tags:
         - Statements 2.0
-      summary: IF-007.009 - Get the Verification Query Public Statement (vqPS) for a
+      summary:
+        IF-007.009 - Get the Verification Query Public Statement (vqPS) for a
         given identifier.
-      description: Get the Verification Query Public Statement (vqPS) for a given
+      description:
+        Get the Verification Query Public Statement (vqPS) for a given
         identifier.
       operationId: getVqPS
       parameters:
@@ -92,7 +94,8 @@ paths:
             default: 20
         - name: sort
           in: query
-          description: "Sorting criteria in the format: property,(asc|desc). Default sort
+          description:
+            "Sorting criteria in the format: property,(asc|desc). Default sort
             order is ascending. Multiple sort criteria are supported."
           schema:
             type: array
@@ -202,7 +205,8 @@ paths:
             default: 20
         - name: sort
           in: query
-          description: "Sorting criteria in the format: property,(asc|desc). Default sort
+          description:
+            "Sorting criteria in the format: property,(asc|desc). Default sort
             order is ascending. Multiple sort criteria are supported."
           schema:
             type: array
@@ -239,9 +243,11 @@ paths:
     get:
       tags:
         - Statements 2.0
-      summary: IF-007.018 - Get the currently active Protected Issuance Trust List
+      summary:
+        IF-007.018 - Get the currently active Protected Issuance Trust List
         Statement (piTLS) for the ecosystem.
-      description: Get the currently active Protected Issuance Trust List Statement
+      description:
+        Get the currently active Protected Issuance Trust List Statement
         (piTLS) for the ecosystem.
       operationId: getActivePiTLS
       responses:
@@ -275,9 +281,11 @@ paths:
     get:
       tags:
         - Statements 2.0
-      summary: IF-007.015 - Get the Protected Issuance Trust List Statement (piTLS)
+      summary:
+        IF-007.015 - Get the Protected Issuance Trust List Statement (piTLS)
         for a given identifier.
-      description: Get the Protected Issuance Trust List Statement (piTLS) for a given
+      description:
+        Get the Protected Issuance Trust List Statement (piTLS) for a given
         identifier.
       operationId: getPiTLS
       parameters:
@@ -347,7 +355,8 @@ paths:
             default: 20
         - name: sort
           in: query
-          description: "Sorting criteria in the format: property,(asc|desc). Default sort
+          description:
+            "Sorting criteria in the format: property,(asc|desc). Default sort
             order is ascending. Multiple sort criteria are supported."
           schema:
             type: array
@@ -384,9 +393,11 @@ paths:
     get:
       tags:
         - Statements 2.0
-      summary: IF-007.013 - Get the Protected Issuance Authorization Trust Statement
+      summary:
+        IF-007.013 - Get the Protected Issuance Authorization Trust Statement
         (piaTS) for a given identifier.
-      description: Get the Protected Issuance Authorization Trust Statement (piaTS)
+      description:
+        Get the Protected Issuance Authorization Trust Statement (piaTS)
         for a given identifier.
       operationId: getPiaTS
       parameters:
@@ -427,7 +438,8 @@ paths:
     get:
       tags:
         - Statements 2.0
-      summary: IF-007.014 - List the Protected Issuance Authorization Trust Statement
+      summary:
+        IF-007.014 - List the Protected Issuance Authorization Trust Statement
         (piaTS).
       description: List the Protected Issuance Authorization Trust Statement (piaTS).
       operationId: listPiaTS
@@ -457,7 +469,8 @@ paths:
             default: 20
         - name: sort
           in: query
-          description: "Sorting criteria in the format: property,(asc|desc). Default sort
+          description:
+            "Sorting criteria in the format: property,(asc|desc). Default sort
             order is ascending. Multiple sort criteria are supported."
           schema:
             type: array
@@ -600,7 +613,8 @@ paths:
             default: 20
         - name: sort
           in: query
-          description: "Sorting criteria in the format: property,(asc|desc). Default sort
+          description:
+            "Sorting criteria in the format: property,(asc|desc). Default sort
             order is ascending. Multiple sort criteria are supported."
           schema:
             type: array
@@ -683,7 +697,8 @@ paths:
     get:
       tags:
         - Trust Statement
-      summary: IF-007.004 - Get verification trust statement entries for a given vc
+      summary:
+        IF-007.004 - Get verification trust statement entries for a given vc
         schema identifier.
       description: Get issuance trust statement entries for a given vc schema identifier.
       operationId: getTrustStatementsForVerificationVcSchema
@@ -734,7 +749,8 @@ paths:
     get:
       tags:
         - Trust Statement
-      summary: IF-007.003 - Get issuance trust statement entries for a given vc schema
+      summary:
+        IF-007.003 - Get issuance trust statement entries for a given vc schema
         identifier.
       description: Get issuance trust statement entries for a given vc schema identifier.
       operationId: getTrustStatementsForIssuanceVcSchema
