@@ -109,12 +109,12 @@ export class OIDVCIService {
         headers: proof ? headers.set("DPoP", proof) : headers,
       });
 
+    if (!dpopKeys) {
+      return postToken();
+    }
+
     return this.fetchNonceResponse(nonceEndpointUrl).pipe(
       switchMap(({ headers: nonceHeaders }) => {
-        if (!dpopKeys) {
-          return postToken();
-        }
-
         const postTokenWithDpop = (nonce: string | null) =>
           from(
             this.dpopService.createProof(
@@ -173,43 +173,41 @@ export class OIDVCIService {
     credentialEndpointUrl: string,
     nonceEndpointUrl: string,
     payload: any | string,
-    bearerToken: string,
+    accessToken: string,
     dpopKeys?: DpopKeyPair,
   ): Observable<CredentialEndpointResponse | string> {
     const encrypted = typeof payload === "string";
-    const nonceResponse$ = this.fetchNonceResponse(nonceEndpointUrl);
     const headers = {
-      Authorization: `Bearer ${bearerToken}`,
+      Authorization: `${dpopKeys ? "DPoP" : "Bearer"} ${accessToken}`,
       "Content-Type": encrypted ? "application/jwt" : "application/json",
     };
 
-    if (!!dpopKeys) {
-      return nonceResponse$.pipe(
-        switchMap(({ headers: nonceHeaders }) =>
-          from(
-            this.dpopService.createProof(
-              dpopKeys,
-              "POST",
-              credentialEndpointUrl,
-              nonceHeaders.get(OIDVCIService.DPOP_NONCE_HEADER) ?? undefined,
-              bearerToken,
-            ),
-          ),
-        ),
-        switchMap((dpopProof) => {
-          console.log("DPoP Proof created:", dpopProof);
-          return this.http.post<any | string>(credentialEndpointUrl, payload, {
-            headers: { ...headers, DPoP: dpopProof as string },
-            responseType: encrypted ? ("text" as any) : "json",
-          });
-        }),
-      );
+    if (!dpopKeys) {
+      return this.http.post<any | string>(credentialEndpointUrl, payload, {
+        headers,
+        responseType: encrypted ? ("text" as any) : "json",
+      });
     }
 
-    return this.http.post<any | string>(credentialEndpointUrl, payload, {
-      headers,
-      responseType: encrypted ? ("text" as any) : "json",
-    });
+    return this.fetchNonceResponse(nonceEndpointUrl).pipe(
+      switchMap(({ headers: nonceHeaders }) =>
+        from(
+          this.dpopService.createProof(
+            dpopKeys,
+            "POST",
+            credentialEndpointUrl,
+            nonceHeaders.get(OIDVCIService.DPOP_NONCE_HEADER) ?? undefined,
+            accessToken,
+          ),
+        ),
+      ),
+      switchMap((dpopProof) =>
+        this.http.post<any | string>(credentialEndpointUrl, payload, {
+          headers: { ...headers, DPoP: dpopProof },
+          responseType: encrypted ? ("text" as any) : "json",
+        }),
+      ),
+    );
   }
 
   public fetchRegistryEntry(
